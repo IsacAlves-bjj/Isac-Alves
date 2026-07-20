@@ -1,0 +1,8 @@
+*.xlsm
+*.xlsb
+*.xls
+*.xlsx
+~$*
+*.tmp
+Thumbs.db
+.DS_Store
