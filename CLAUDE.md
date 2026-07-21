@@ -191,14 +191,24 @@ esta API, mesmo que isso signifique uma API um pouco menos "pura".
 Não há ambiente de CI para VBA. O fluxo é:
 
 1. Abrir o arquivo `.xlsm`/projeto VBA de destino.
-2. Importar os módulos/classes de `Core/` (e demais camadas
-   conforme forem sendo desenvolvidas) via VBA IDE
-   (Arquivo > Importar Arquivo, ou arrastar para o Project Explorer).
-3. Rodar `M_Test_Core.RunAllCoreTests` no Immediate Window
-   (`Ctrl+G` para abrir, digite `RunAllCoreTests` e Enter).
+2. Importar os módulos/classes de `Core/` e `Components/` (e demais
+   camadas conforme forem sendo desenvolvidas), incluindo os dubles
+   `clsFakeGui*` de `Tests/`, via VBA IDE (Arquivo > Importar Arquivo,
+   ou arrastar para o Project Explorer).
+3. Rodar no Immediate Window (`Ctrl+G` para abrir):
+   - `M_Test_Core.RunAllCoreTests` — testes do Core (v0.2).
+   - `M_Test_Components.RunAllComponentsTests` — testes de Components
+     (v0.3): `clsSAPField`, `clsSAPGrid`, `clsSAPButton`,
+     `clsSAPCheckBox`, `clsSAPRadioButton`, `clsSAPComboBox`,
+     `clsSAPStatusBar`, `clsSAPTab`.
+   - Cada camada nova ganha seu próprio `M_Test_<Camada>.RunAll<Camada>Tests`
+     — rode o de toda camada que você tocar, não só o da mais nova.
 4. Testes que dependem de SAP aberto se auto-identificam e aparecem
    como `[SKIP]` quando o ambiente não está disponível — isso é
-   esperado, não é falha.
+   esperado, não é falha. Testes de integração/performance que exigem
+   estado externo (sessão conectada, tela específica) não entram no
+   `RunAll...Tests()` automático — são `Sub` separadas, chamadas
+   manualmente (ex.: `Test_TypedStatusBar_ComSessaoReal_Integracao`).
 
 ## 10. Arquivos de referência
 
