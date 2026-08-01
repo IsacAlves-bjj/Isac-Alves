@@ -118,9 +118,10 @@ End Sub
 ' TypedRadioButton(Id) devolvem clsSAPCheckBox/clsSAPRadioButton;
 ' para combo boxes, TypedComboBox(Id) devolve um clsSAPComboBox; para
 ' a barra de status, TypedStatusBar(Id) devolve um clsSAPStatusBar;
-' para abas, TypedTab(Id) devolve um clsSAPTab.
-' Os demais wrappers (clsSAPTable...) ainda chegam no Components
-' (v0.3).
+' para abas, TypedTab(Id) devolve um clsSAPTab; para table controls
+' classicos, TypedTable(Id) devolve um clsSAPTable.
+' Os demais wrappers (clsSAPShell, clsSAPTree, clsSAPMenu...) ainda
+' chegam no Components (v0.3).
 Public Function Field(ByVal Id As String) As Object
     On Error GoTo ErrHandler
     Set Field = mSession.GetComponent(Id)
@@ -284,6 +285,26 @@ Public Function TypedTab(ByVal Id As String) As clsSAPTab
 
 ErrHandler:
     HandleError Err, "TypedTab"
+End Function
+
+' Acesso tipado a table controls classicos (GuiTableControl), via
+' Components/clsSAPTable (v0.3). Valida o tipo do componente e esconde
+' a rolagem manual (VerticalScrollbar) que a API nativa exige para
+' ler/escrever celulas fora da janela visivel - GetCellValue/
+' SetCellValue recebem sempre a linha ABSOLUTA, como em TypedGrid.
+Public Function TypedTable(ByVal Id As String) As clsSAPTable
+    On Error GoTo ErrHandler
+
+    Dim native As Object
+    Set native = mSession.GetComponent(Id)
+
+    Dim result As New clsSAPTable
+    result.Init native, Id
+    Set TypedTable = result
+    Exit Function
+
+ErrHandler:
+    HandleError Err, "TypedTable"
 End Function
 
 ' Confirma a tela atual (Enter).

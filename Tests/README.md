@@ -17,7 +17,7 @@ correspondente, com quatro tipos de teste (briefing, seção 15):
 ## Arquivos atuais
 
 - `M_Test_Core.bas` — testes do Core (v0.2)
-- `M_Test_Components.bas` — testes de Components (v0.3): `clsSAPField`, `clsSAPGrid`, `clsSAPButton`, `clsSAPCheckBox`, `clsSAPRadioButton`, `clsSAPComboBox`, `clsSAPStatusBar` e `clsSAPTab`
+- `M_Test_Components.bas` — testes de Components (v0.3): `clsSAPField`, `clsSAPGrid`, `clsSAPButton`, `clsSAPCheckBox`, `clsSAPRadioButton`, `clsSAPComboBox`, `clsSAPStatusBar`, `clsSAPTab` e `clsSAPTable`
 - `clsFakeGuiTextField.cls` — duble de teste (não é parte do Framework entregue) que imita a interface de um `GuiTextField`/`GuiCTextField`, permitindo testar `clsSAPField` sem depender de uma sessão SAP real
 - `clsFakeGuiGridView.cls` — duble de teste (não é parte do Framework entregue) que imita a interface de um `GuiGridView`, permitindo testar `clsSAPGrid` sem depender de uma sessão SAP real
 - `clsFakeGuiButton.cls` — duble de teste (não é parte do Framework entregue) que imita a interface de um `GuiButton`, permitindo testar `clsSAPButton` sem depender de uma sessão SAP real
@@ -26,3 +26,4 @@ correspondente, com quatro tipos de teste (briefing, seção 15):
 - `clsFakeGuiComboBox.cls` / `clsFakeGuiComboBoxEntry.cls` — dublês de teste (não são parte do Framework entregue) que imitam a interface de um `GuiComboBox` e suas entradas, permitindo testar `clsSAPComboBox` sem depender de uma sessão SAP real
 - `clsFakeGuiStatusBar.cls` — duble de teste (não é parte do Framework entregue) que imita a interface de uma `GuiStatusbar`, permitindo testar `clsSAPStatusBar` sem depender de uma sessão SAP real
 - `clsFakeGuiTab.cls` — duble de teste (não é parte do Framework entregue) que imita a interface de um `GuiTab`, permitindo testar `clsSAPTab` sem depender de uma sessão SAP real
+- `clsFakeGuiTableControl.cls` (com `clsFakeGuiTableColumn.cls`, `clsFakeGuiTableColumns.cls`, `clsFakeGuiTableCell.cls`, `clsFakeGuiTableRow.cls` e `clsFakeGuiScrollbar.cls`) — dublês de teste (não são parte do Framework entregue) que imitam a interface de um `GuiTableControl` — incluindo o comportamento de rolagem (`GetCell` por linha relativa à posição do `VerticalScrollbar`) — permitindo testar `clsSAPTable` sem depender de uma sessão SAP real

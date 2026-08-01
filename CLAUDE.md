@@ -48,10 +48,13 @@ a fonte de verdade.
   (caixas de seleção/radio buttons, via `SAP.TypedCheckBox(Id)`/
   `SAP.TypedRadioButton(Id)`), `clsSAPComboBox` (via
   `SAP.TypedComboBox(Id)`), `clsSAPStatusBar` (barra de mensagens,
-  via `SAP.TypedStatusBar(Id)`) e `clsSAPTab` (abas, via
-  `SAP.TypedTab(Id)`) entregues. Ver `Components/README.md` para o
-  padrão de design a seguir nos próximos wrappers (`clsSAPTable`,
-  `clsSAPShell`, etc.).
+  via `SAP.TypedStatusBar(Id)`), `clsSAPTab` (abas, via
+  `SAP.TypedTab(Id)`) e `clsSAPTable` (table control clássico, via
+  `SAP.TypedTable(Id)` — API implementada a partir da documentação do
+  SAP GUI Scripting mas ainda **não validada contra sessão SAP real**,
+  ver nota em `Components/README.md`) entregues. Ver
+  `Components/README.md` para o padrão de design a seguir nos próximos
+  wrappers (`clsSAPShell`, `clsSAPTree`, `clsSAPMenu`).
 - **v0.5 (Services), Extensions, RC, v1.0** — ainda não iniciados.
   Ver seção 7 (Roadmap) abaixo.
 
@@ -150,20 +153,27 @@ Nenhum código entra no projeto sem:
 |---|---|---|
 | v0.1 | Kit inicial (arquitetura conceitual) | Descartado como código, mantido como inspiração |
 | v0.2 | Core | Entregue — ver `Core/README.md` |
-| **v0.3** | **Components** | **Em andamento — `clsSAPField`, `clsSAPGrid`, `clsSAPButton`, `clsSAPCheckBox`, `clsSAPRadioButton`, `clsSAPComboBox`, `clsSAPStatusBar` e `clsSAPTab` entregues, ver `Components/README.md`** |
+| **v0.3** | **Components** | **Em andamento — `clsSAPField`, `clsSAPGrid`, `clsSAPButton`, `clsSAPCheckBox`, `clsSAPRadioButton`, `clsSAPComboBox`, `clsSAPStatusBar`, `clsSAPTab` e `clsSAPTable` entregues, ver `Components/README.md`** |
 | v0.5 | Services | Não iniciado |
 | RC | Testes, documentação, exemplos consolidados | Não iniciado |
 | v1.0 | Release profissional | Não iniciado |
 
 Sugestão de próximo passo natural: continuar **v0.3 — Components**.
 `clsSAPField`, `clsSAPGrid`, `clsSAPButton`, `clsSAPCheckBox`,
-`clsSAPRadioButton`, `clsSAPComboBox`, `clsSAPStatusBar` e `clsSAPTab`
-já foram entregues — ver `Components/README.md`. Dos que restam,
-`clsSAPTable`/`GuiTableControl` é o de maior ganho (mesma dor do
-grid, em telas mais antigas), mas também o de maior risco de
-hallucination de API — validar contra uma sessão SAP real antes de
-finalizar, como já feito com `clsSAPGrid`. `clsSAPShell`/`clsSAPTree`/
-`clsSAPMenu` são os de uso mais nichado e menor prioridade.
+`clsSAPRadioButton`, `clsSAPComboBox`, `clsSAPStatusBar`, `clsSAPTab` e
+`clsSAPTable` já foram entregues — ver `Components/README.md`.
+**Importante:** `clsSAPTable`/`GuiTableControl` foi implementado a
+partir da API documentada do SAP GUI Scripting, mas a suposição
+central (que `GetCell` usa linha relativa à janela visível, exigindo
+rolagem manual via `VerticalScrollbar.Position`) ainda **não foi
+validada contra uma sessão SAP real** — antes de usar em produção,
+rode `Test_TypedTable_ComSessaoReal_Integracao` e confira as três
+suposições de risco documentadas em `Components/clsSAPTable.cls` e
+`Components/README.md`, como já feito com `clsSAPGrid`/
+`clsSAPStatusBar`. Do que resta do v0.3, `clsSAPShell`/`clsSAPTree`/
+`clsSAPMenu` são os de uso mais nichado e menor prioridade — bons
+candidatos para a próxima rodada, ou avançar para v0.5 (Services) se
+o usuário preferir.
 
 ## 8. Contexto de uso real (por que isso importa)
 
@@ -200,7 +210,7 @@ Não há ambiente de CI para VBA. O fluxo é:
    - `M_Test_Components.RunAllComponentsTests` — testes de Components
      (v0.3): `clsSAPField`, `clsSAPGrid`, `clsSAPButton`,
      `clsSAPCheckBox`, `clsSAPRadioButton`, `clsSAPComboBox`,
-     `clsSAPStatusBar`, `clsSAPTab`.
+     `clsSAPStatusBar`, `clsSAPTab`, `clsSAPTable`.
    - Cada camada nova ganha seu próprio `M_Test_<Camada>.RunAll<Camada>Tests`
      — rode o de toda camada que você tocar, não só o da mais nova.
 4. Testes que dependem de SAP aberto se auto-identificam e aparecem

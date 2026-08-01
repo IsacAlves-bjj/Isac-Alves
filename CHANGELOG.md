@@ -111,15 +111,45 @@ Adicionado (`clsSAPTab`):
 - `Examples/Example_Components_Tab.bas` — checar `Selected` e navegar
   para uma aba num fluxo de VA02
 
+Adicionado (`clsSAPTable`):
+- `Components/clsSAPTable.cls` — wrapper tipado para `GuiTableControl`
+  (o "table control" clássico de telas mais antigas de SD/MM):
+  validação de tipo no `Init`, validação de índice de linha em todo
+  método que recebe `Row`, `GetCellValue`/`SetCellValue` por linha
+  ABSOLUTA escondendo a rolagem manual (`VerticalScrollbar.Position`)
+  que a API nativa exige para células fora da janela visível
+  (diferença importante em relação a `clsSAPGrid`, documentada no
+  `Components/README.md`), `SelectRow`/`IsRowSelected`/
+  `ClearSelection`, `ColumnTitles`, `RowCount`, `VisibleRowCount`,
+  `FirstVisibleRow`, `IsEmpty`, `ToString`, `NativeObject` como escape
+  hatch. Identificado como o de maior ganho e também o de maior risco
+  de hallucination de API entre os componentes restantes do v0.3 — a
+  suposição de que `GetCell` usa linha relativa (não absoluta) não pôde
+  ser validada contra uma sessão SAP real neste ambiente de
+  desenvolvimento; ver nota de implementação no `Components/README.md`
+  e rodar `Test_TypedTable_ComSessaoReal_Integracao` antes de depender
+  disso em produção
+- `Core/clsSAP.cls` — novo método `TypedTable(Id)`, análogo aos demais
+  `Typed<X>`
+- `Tests/clsFakeGuiTableControl.cls` (com `clsFakeGuiTableColumn.cls`,
+  `clsFakeGuiTableColumns.cls`, `clsFakeGuiTableCell.cls`,
+  `clsFakeGuiTableRow.cls` e `clsFakeGuiScrollbar.cls`) — dublês de
+  teste usados pelos testes de Components, incluindo simulação do
+  comportamento de rolagem
+- `Examples/Example_Components_Table.bas` — ler todas as linhas por
+  índice absoluto sem se preocupar com rolagem, selecionar linha, erro
+  amigável em linha fora do intervalo
+
 Comum:
 - `Tests/M_Test_Components.bas` — testes positivo/negativo/erro/
   performance de `clsSAPField`, `clsSAPGrid`, `clsSAPButton`,
   `clsSAPCheckBox`, `clsSAPRadioButton`, `clsSAPComboBox`,
-  `clsSAPStatusBar` e `clsSAPTab`, executáveis sem SAP aberto (dubles
-  de teste imitam a interface nativa por late binding); testes de
-  integração com sessão real ficam como `Sub` manual separada
+  `clsSAPStatusBar`, `clsSAPTab` e `clsSAPTable`, executáveis sem SAP
+  aberto (dubles de teste imitam a interface nativa por late binding);
+  testes de integração com sessão real ficam como `Sub` manual
+  separada
 - `Components/README.md` atualizado com o padrão de design a seguir
-  para os próximos wrappers (`clsSAPTable`, `clsSAPShell`, etc.)
+  para os próximos wrappers (`clsSAPShell`, `clsSAPTree`, `clsSAPMenu`)
 
 ## v0.2 — Core (2026-07-17)
 

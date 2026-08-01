@@ -23,3 +23,4 @@ pelo menos um exemplo aqui (critério de aceite, briefing seção 16).
 - `Example_Components_ComboBox.bas` — uso de `clsSAPComboBox` via `SAP.TypedComboBox(...)`: `HasKey`/`Key` com validação, erro amigável em chave inválida (Components, v0.3)
 - `Example_Components_StatusBar.bas` — uso de `clsSAPStatusBar` via `SAP.TypedStatusBar(...)`: checar `IsError()`/`IsWarning()` após `Execute` (Components, v0.3)
 - `Example_Components_Tab.bas` — uso de `clsSAPTab` via `SAP.TypedTab(...)`: checar `Selected` (somente leitura) antes de navegar com `Select()` (Components, v0.3)
+- `Example_Components_Table.bas` — uso de `clsSAPTable` via `SAP.TypedTable(...)`: ler todas as linhas por índice absoluto sem se preocupar com rolagem, selecionar linha, erro amigável em linha fora do intervalo (Components, v0.3)

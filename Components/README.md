@@ -2,7 +2,8 @@
 
 **Status: v0.3 em andamento — `clsSAPField`, `clsSAPGrid`,
 `clsSAPButton`, `clsSAPCheckBox`, `clsSAPRadioButton`,
-`clsSAPComboBox`, `clsSAPStatusBar` e `clsSAPTab` entregues.**
+`clsSAPComboBox`, `clsSAPStatusBar`, `clsSAPTab` e `clsSAPTable`
+entregues.**
 
 Wrappers tipados sobre os componentes nativos do SAP GUI Scripting.
 Antes desta camada, `clsSAP.Field(...)` retorna o objeto GUI nativo
@@ -22,7 +23,8 @@ devolve um `clsSAPButton`, `clsSAP.TypedCheckBox(Id)`/
 `clsSAP.TypedRadioButton(Id)` devolvem `clsSAPCheckBox`/
 `clsSAPRadioButton`, `clsSAP.TypedComboBox(Id)` devolve um
 `clsSAPComboBox`, `clsSAP.TypedStatusBar(Id)` devolve um
-`clsSAPStatusBar`, `clsSAP.TypedTab(Id)` devolve um `clsSAPTab`.
+`clsSAPStatusBar`, `clsSAP.TypedTab(Id)` devolve um `clsSAPTab`,
+`clsSAP.TypedTable(Id)` devolve um `clsSAPTable`.
 
 ## `clsSAPField` (entregue)
 
@@ -288,6 +290,87 @@ disso em produção.
 Ver `Examples/Example_Components_Tab.bas` e
 `Tests/M_Test_Components.bas`.
 
+## `clsSAPTable` (entregue)
+
+Wrapper para `GuiTableControl` — o "table control" clássico usado em
+telas mais antigas de SD/MM (ex.: algumas variantes de overview de
+itens em VA01/VA02, condições em VK11/VK12). Identificado no
+`Components/README.md` anterior como o de maior ganho entre os
+componentes restantes do v0.3 — mas também o de maior risco, pelos
+motivos abaixo.
+
+```vba
+Dim SAP As New clsSAP
+SAP.Connect
+SAP.Transaction "VA02"
+
+Dim Tabela As clsSAPTable
+Set Tabela = SAP.TypedTable("wnd[0]/usr/tblSAPMV45ATCTRL_U_ERF_AUFTRAG")
+
+Dim i As Long
+For i = 0 To Tabela.RowCount - 1
+    Debug.Print Tabela.GetCellValue(i, 0)   ' linha ABSOLUTA, sem se preocupar com rolagem
+Next i
+```
+
+O que ele adiciona sobre o objeto nativo:
+- Valida no `Init` que o componente resolvido é de fato um
+  `GuiTableControl`; falha imediatamente com `clsSAPException` clara
+  se o `Id` apontar para outro tipo de componente.
+- Valida o índice de linha em todo método que recebe `Row`
+  (`GetCellValue`, `SetCellValue`, `SelectRow`, `IsRowSelected`),
+  convertendo o erro críptico de COM de "linha fora do intervalo" em
+  uma mensagem legível com o total de linhas.
+- `GetCellValue`/`SetCellValue` recebem sempre a linha **absoluta**
+  (0 a `RowCount - 1`) e escondem a rolagem manual que a API nativa
+  exige — ver nota de implementação abaixo. Sem o wrapper, cada
+  automação teria que calcular `VerticalScrollbar.Position` e a linha
+  relativa antes de toda leitura/escrita fora da janela visível.
+- `SelectRow`/`IsRowSelected`/`ClearSelection` — seleção por linha
+  absoluta via `GetAbsoluteRow`, que (diferente de `GetCell`) já
+  trabalha com índice absoluto na API nativa.
+- `ColumnTitles()` — títulos de exibição das colunas, na ordem
+  nativa. Diferente de `clsSAPGrid.ColumnIds()`, aqui não existe um
+  nome técnico de coluna — o acesso à célula é sempre por **índice**
+  (0-based), não por string.
+- `RowCount`, `VisibleRowCount`, `FirstVisibleRow`, `IsEmpty()`,
+  `ToString()`, `NativeObject()` como escape hatch.
+
+**Nota de implementação importante — risco de hallucination de API:**
+diferente de `GuiGridView.GetCellValue`, que aceita a linha absoluta
+da grid inteira, o método nativo `GuiTableControl.GetCell(Row, Col)`
+só aceita a linha **relativa à janela atualmente visível** (0 a
+`VisibleRowCount - 1`). É a mesma dor de `clsSAPGrid`, só que pior,
+porque exige rolar a tabela manualmente (`VerticalScrollbar.Position`)
+antes de ler ou escrever uma célula fora da janela visível — o motivo
+pelo qual este wrapper foi cotado como o de maior risco de
+hallucination entre os componentes restantes do v0.3. A implementação
+atual (`ScrollToRow` interno) foi escrita a partir da API documentada
+do SAP GUI Scripting, mas **não pôde ser validada contra uma sessão
+SAP real neste ambiente de desenvolvimento**. Antes de depender disso
+em produção, rode
+`Test_TypedTable_ComSessaoReal_Integracao` (`Tests/M_Test_Components.bas`)
+contra uma tela real com table control e confirme especialmente:
+1. Se `GetCell` realmente espera linha relativa à visível (não
+   absoluta);
+2. Se `VerticalScrollbar.Position` aceita atribuição direta e reflete
+   a rolagem imediatamente na leitura seguinte;
+3. Se `Columns(i).Title` retorna o título de exibição esperado.
+
+Como já feito com `clsSAPGrid`/`clsSAPStatusBar`/`clsSAPTab`, trate
+qualquer divergência encontrada como prioridade antes de usar
+`clsSAPTable` em automação de produção.
+
+**Ainda não coberto por esta versão:** navegação de cursor
+(`CurrentCol`/`CurrentRow`), rolagem horizontal
+(`HorizontalScrollbar`) e seleção múltipla em lote (a API nativa do
+table control clássico não expõe um `SelectAll` como
+`GuiGridView.SelectAll` — `ClearSelection` percorre linha a linha).
+Ficam para uma próxima iteração, se o uso real exigir.
+
+Ver `Examples/Example_Components_Table.bas` e
+`Tests/M_Test_Components.bas`.
+
 ## Classes previstas (restante do v0.3)
 
 | Classe | Componente SAP GUI equivalente | Status |
@@ -300,7 +383,7 @@ Ver `Examples/Example_Components_Tab.bas` e
 | `clsSAPComboBox` | `GuiComboBox` | **Entregue** |
 | `clsSAPStatusBar` | `GuiStatusbar` | **Entregue** |
 | `clsSAPTab` | `GuiTab` | **Entregue** |
-| `clsSAPTable` | `GuiTableControl` | Não iniciado |
+| `clsSAPTable` | `GuiTableControl` | **Entregue (aguarda validação contra sessão SAP real — ver nota acima)** |
 | `clsSAPShell` | `GuiShell` | Não iniciado |
 | `clsSAPTree` | `GuiTree` | Não iniciado |
 | `clsSAPMenu` | `GuiMenu` | Não iniciado |
@@ -311,8 +394,8 @@ Cada wrapper deve:
 1. Receber o componente nativo já resolvido por `clsSAPSession.GetComponent`
    (na prática, via `clsSAP.Typed<Componente>(Id)` — ver `TypedField`,
    `TypedGrid`, `TypedButton`, `TypedCheckBox`, `TypedRadioButton`,
-   `TypedComboBox`, `TypedStatusBar` e `TypedTab` como referência de
-   padrão a seguir para os próximos).
+   `TypedComboBox`, `TypedStatusBar`, `TypedTab` e `TypedTable` como
+   referência de padrão a seguir para os próximos).
 2. Validar o `Type` do componente nativo antes de expor métodos (ex.: `clsSAPGrid` deve confirmar que o objeto é de fato um `GuiGridView` e lançar `clsSAPException` clara se não for).
 3. Nunca chamar `FindById` diretamente — sempre receber o objeto já resolvido pelo Core.
 4. Converter todo erro para `clsSAPException` em todo método público (mesmo padrão do Core: `Init` recebe `Number`/`Description`/`ClassName`/`MethodName`/`FieldId`).

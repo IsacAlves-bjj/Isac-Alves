@@ -9,12 +9,13 @@ Option Explicit
 ' Ao contrario de M_Test_Core, a maioria destes testes NAO depende
 ' de uma sessao SAP real: clsSAPField, clsSAPGrid, clsSAPButton,
 ' clsSAPCheckBox, clsSAPRadioButton, clsSAPComboBox,
-' clsSAPStatusBar e clsSAPTab acessam seu componente nativo por late
-' binding (As Object), entao dubles de teste (clsFakeGuiTextField,
-' clsFakeGuiGridView, clsFakeGuiButton, clsFakeGuiCheckBox,
-' clsFakeGuiRadioButton, clsFakeGuiComboBox, clsFakeGuiStatusBar,
-' clsFakeGuiTab) que imitam a interface nativa sao suficientes para
-' validar toda a logica dos wrappers. Isso os torna rapidos e
+' clsSAPStatusBar, clsSAPTab e clsSAPTable acessam seu componente
+' nativo por late binding (As Object), entao dubles de teste
+' (clsFakeGuiTextField, clsFakeGuiGridView, clsFakeGuiButton,
+' clsFakeGuiCheckBox, clsFakeGuiRadioButton, clsFakeGuiComboBox,
+' clsFakeGuiStatusBar, clsFakeGuiTab, clsFakeGuiTableControl e
+' fixtures de apoio) que imitam a interface nativa sao suficientes
+' para validar toda a logica dos wrappers. Isso os torna rapidos e
 ' executaveis em qualquer maquina, com ou sem SAP aberto.
 '
 ' Excecao: os testes Test_Typed<X>_ComSessaoReal_Integracao, que
@@ -113,6 +114,26 @@ Public Sub RunAllComponentsTests()
     Test_Tab_Select_Positivo
     Test_Tab_Select_Erro
     Test_Tab_ToString_Positivo
+
+    Test_Table_Init_Positivo
+    Test_Table_Init_TipoInvalido_Negativo
+    Test_Table_Init_ComponenteNulo_Negativo
+    Test_Table_RowCount_VisibleRowCount_ColumnCount_Positivo
+    Test_Table_ColumnTitles_Positivo
+    Test_Table_GetCellValue_LinhaVisivel_Positivo
+    Test_Table_GetCellValue_ForcaRolagem_Positivo
+    Test_Table_GetCellValue_LinhaForaDoIntervalo_Erro
+    Test_Table_GetCellValue_ErroNativo_Erro
+    Test_Table_SetCellValue_Positivo
+    Test_Table_SetCellValue_LinhaForaDoIntervalo_Erro
+    Test_Table_SelectRow_IsRowSelected_Positivo
+    Test_Table_SelectRow_Desselecionar_Positivo
+    Test_Table_SelectRow_ForaDoIntervalo_Erro
+    Test_Table_ClearSelection_Positivo
+    Test_Table_IsEmpty_Positivo
+    Test_Table_FirstVisibleRow_Positivo
+    Test_Table_ToString_Positivo
+    Test_Table_Performance_LeituraComRolagem
 
     Debug.Print String(60, "=")
     Debug.Print "Testes concluidos. Verifique [FAIL] acima, se houver."
@@ -1254,6 +1275,286 @@ Public Sub Test_TypedTab_ComSessaoReal_Integracao(ByVal SAP As clsSAP, ByVal Fie
     Assert Not tab Is Nothing, "TypedTab deve retornar um clsSAPTab valido"
     Assert tab.Id = FieldId, "TypedTab.Id deve ser o Id informado"
     Debug.Print "  Text='" & tab.Text & "' | Selected=" & tab.Selected
+End Sub
+
+' ================== clsSAPTable ==================
+' clsFakeGuiTableControl vem pre-carregado com 5 linhas x colunas
+' MATNR/MENGE (MAT-001/10 .. MAT-005/50) e VisibleRowCount=3, para dar
+' para testar tanto leitura de linha ja visivel quanto leitura que
+' forca rolagem - ver Tests/clsFakeGuiTableControl.cls.
+
+' ---- Teste positivo: Init aceita GuiTableControl ----
+Private Sub Test_Table_Init_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "wnd[0]/usr/tblSAPMV45ATCTRL_U_ERF_AUFTRAG"
+
+    Assert tbl.Id = "wnd[0]/usr/tblSAPMV45ATCTRL_U_ERF_AUFTRAG", "Init/Id armazena o FieldId informado"
+End Sub
+
+' ---- Teste negativo: Init deve recusar tipos incompativeis ----
+Private Sub Test_Table_Init_TipoInvalido_Negativo()
+    Dim fake As New clsFakeGuiTableControl
+    fake.Type = "GuiGridView"
+
+    Dim tbl As New clsSAPTable
+    On Error Resume Next
+    tbl.Init fake, "wnd[0]/usr/campo"
+    Assert Err.Number <> 0, "Init deve falhar para componente que nao e table control"
+    On Error GoTo 0
+End Sub
+
+' ---- Teste negativo: Init deve recusar componente nulo ----
+Private Sub Test_Table_Init_ComponenteNulo_Negativo()
+    Dim tbl As New clsSAPTable
+    On Error Resume Next
+    tbl.Init Nothing, "wnd[0]/usr/tabela"
+    Assert Err.Number <> 0, "Init deve falhar quando o componente nativo e Nothing"
+    On Error GoTo 0
+End Sub
+
+' ---- Teste positivo: RowCount, VisibleRowCount e ColumnCount refletem o nativo ----
+Private Sub Test_Table_RowCount_VisibleRowCount_ColumnCount_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    Assert tbl.RowCount = 5, "RowCount deve refletir o nativo (5 linhas de teste)"
+    Assert tbl.VisibleRowCount = 3, "VisibleRowCount deve refletir o nativo (3 linhas visiveis de teste)"
+    Assert tbl.ColumnCount = 2, "ColumnCount deve refletir o nativo (2 colunas de teste)"
+End Sub
+
+' ---- Teste positivo: ColumnTitles lista os titulos na ordem nativa ----
+Private Sub Test_Table_ColumnTitles_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    Dim titulos As Collection
+    Set titulos = tbl.ColumnTitles()
+
+    Assert titulos.Count = 2, "ColumnTitles deve retornar uma entrada por coluna"
+    Assert titulos(1) = "MATNR", "ColumnTitles deve preservar a ordem nativa (1a coluna)"
+    Assert titulos(2) = "MENGE", "ColumnTitles deve preservar a ordem nativa (2a coluna)"
+End Sub
+
+' ---- Teste positivo: GetCellValue le uma linha ja visivel sem rolar ----
+Private Sub Test_Table_GetCellValue_LinhaVisivel_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    Assert tbl.GetCellValue(1, 0) = "MAT-002", "GetCellValue deve ler a linha/coluna corretas quando ja visivel"
+    Assert fake.VerticalScrollbar.Position = 0, "GetCellValue nao deve rolar quando a linha ja esta visivel"
+End Sub
+
+' ---- Teste positivo: GetCellValue rola automaticamente para linhas
+'      fora da janela visivel atual - o ponto central de clsSAPTable
+'      em relacao a API nativa (GetCell so aceita linha relativa) ----
+Private Sub Test_Table_GetCellValue_ForcaRolagem_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    Assert tbl.GetCellValue(4, 0) = "MAT-005", "GetCellValue deve ler a linha correta mesmo exigindo rolagem"
+    Assert fake.VerticalScrollbar.Position > 0, "GetCellValue deve rolar a tabela quando a linha nao esta visivel"
+    Assert tbl.FirstVisibleRow = fake.VerticalScrollbar.Position, "FirstVisibleRow deve refletir a posicao de rolagem apos GetCellValue"
+End Sub
+
+' ---- Teste de erro: linha fora do intervalo deve virar clsSAPException,
+'      nunca deixar o codigo prosseguir silenciosamente ----
+Private Sub Test_Table_GetCellValue_LinhaForaDoIntervalo_Erro()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    On Error Resume Next
+    Dim v As String
+    v = tbl.GetCellValue(99, 0)
+    Assert Err.Number <> 0, "GetCellValue deve falhar de forma controlada para linha fora do intervalo"
+    On Error GoTo 0
+End Sub
+
+' ---- Teste de erro: falha nativa ao acessar a celula (ex.: tabela
+'      bloqueada) deve virar clsSAPException, nunca erro cru de COM ----
+Private Sub Test_Table_GetCellValue_ErroNativo_Erro()
+    Dim fake As New clsFakeGuiTableControl
+    fake.FailOnGetCell = True
+
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    On Error Resume Next
+    Dim v As String
+    v = tbl.GetCellValue(0, 0)
+    Assert Err.Number <> 0, "GetCellValue deve falhar de forma controlada quando o nativo lanca erro"
+    On Error GoTo 0
+End Sub
+
+' ---- Teste positivo: SetCellValue grava no componente nativo, mesmo
+'      exigindo rolagem previa ----
+Private Sub Test_Table_SetCellValue_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    tbl.SetCellValue 4, 1, "999"
+
+    Assert fake.CellValue(4, 1) = "999", "SetCellValue deve gravar o valor no nativo (via GetCell().Text)"
+End Sub
+
+' ---- Teste de erro: SetCellValue tambem valida o intervalo de linha ----
+Private Sub Test_Table_SetCellValue_LinhaForaDoIntervalo_Erro()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    On Error Resume Next
+    tbl.SetCellValue 99, 0, "X"
+    Assert Err.Number <> 0, "SetCellValue deve falhar de forma controlada para linha fora do intervalo"
+    On Error GoTo 0
+End Sub
+
+' ---- Teste positivo: SelectRow/IsRowSelected usam GetAbsoluteRow, sem
+'      exigir rolagem previa ----
+Private Sub Test_Table_SelectRow_IsRowSelected_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    Assert tbl.IsRowSelected(4) = False, "IsRowSelected deve iniciar False (padrao do duble)"
+
+    tbl.SelectRow 4
+
+    Assert tbl.IsRowSelected(4) = True, "SelectRow deve marcar a linha como selecionada no nativo"
+End Sub
+
+' ---- Teste positivo: SelectRow com Selected:=False desmarca a linha ----
+Private Sub Test_Table_SelectRow_Desselecionar_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    tbl.SelectRow 2
+    tbl.SelectRow 2, False
+
+    Assert tbl.IsRowSelected(2) = False, "SelectRow(Row, False) deve desmarcar a linha no nativo"
+End Sub
+
+' ---- Teste de erro: SelectRow tambem valida o intervalo de linha ----
+Private Sub Test_Table_SelectRow_ForaDoIntervalo_Erro()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    On Error Resume Next
+    tbl.SelectRow 50
+    Assert Err.Number <> 0, "SelectRow deve falhar de forma controlada para linha fora do intervalo"
+    On Error GoTo 0
+End Sub
+
+' ---- Teste positivo: ClearSelection desmarca todas as linhas ----
+Private Sub Test_Table_ClearSelection_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    tbl.SelectRow 0
+    tbl.SelectRow 3
+    tbl.ClearSelection
+
+    Assert tbl.IsRowSelected(0) = False, "ClearSelection deve desmarcar a primeira linha selecionada"
+    Assert tbl.IsRowSelected(3) = False, "ClearSelection deve desmarcar as demais linhas selecionadas"
+End Sub
+
+' ---- Teste positivo: IsEmpty reflete RowCount = 0 ----
+Private Sub Test_Table_IsEmpty_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    Assert tbl.IsEmpty() = False, "IsEmpty deve ser False quando ha linhas (5 na fixture)"
+
+    fake.RowCount = 0
+    Assert tbl.IsEmpty() = True, "IsEmpty deve ser True quando RowCount = 0"
+End Sub
+
+' ---- Teste positivo: FirstVisibleRow (get/let) espelha VerticalScrollbar.Position ----
+Private Sub Test_Table_FirstVisibleRow_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    tbl.FirstVisibleRow = 2
+    Assert fake.VerticalScrollbar.Position = 2, "FirstVisibleRow (let) deve gravar a posicao no nativo"
+    Assert tbl.FirstVisibleRow = 2, "FirstVisibleRow (get) deve refletir o nativo"
+End Sub
+
+' ---- Teste positivo: ToString contem Id, RowCount e VisibleRowCount ----
+Private Sub Test_Table_ToString_Positivo()
+    Dim fake As New clsFakeGuiTableControl
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "wnd[0]/usr/tblITENS"
+
+    Dim s As String
+    s = tbl.ToString()
+
+    Assert InStr(s, "wnd[0]/usr/tblITENS") > 0, "ToString contem o Id da tabela"
+    Assert InStr(s, "5") > 0, "ToString contem o RowCount atual"
+    Assert InStr(s, "3") > 0, "ToString contem o VisibleRowCount atual"
+End Sub
+
+' ---- Teste de performance: ler todas as linhas de uma tabela maior,
+'      atravessando varios "saltos" de rolagem, nao deve degradar de
+'      forma anormal (limite generoso, o objetivo e pegar regressao
+'      grave, nao microbenchmark preciso). ----
+Private Sub Test_Table_Performance_LeituraComRolagem()
+    Const ROWS As Long = 300
+
+    Dim fake As New clsFakeGuiTableControl
+    fake.RowCount = ROWS
+    Dim i As Long
+    For i = 0 To ROWS - 1
+        fake.SeedCell i, 0, "MAT-" & Format(i, "0000")
+    Next i
+
+    Dim tbl As New clsSAPTable
+    tbl.Init fake, "tbl1"
+
+    Dim t0 As Long, t1 As Long
+    t0 = GetTickCount()
+
+    Dim total As Long
+    For i = 0 To ROWS - 1
+        If tbl.GetCellValue(i, 0) <> "" Then total = total + 1
+    Next i
+
+    t1 = GetTickCount()
+
+    Debug.Print "  Leitura de " & ROWS & " linhas (com rolagem automatica): " & (t1 - t0) & " ms"
+
+    Assert total = ROWS, "GetCellValue deve ler todas as linhas corretamente, mesmo cruzando varias janelas de rolagem"
+    Assert (t1 - t0) < 5000, "Leitura completa nao deve degradar de forma anormal em tabela de " & ROWS & " linhas"
+End Sub
+
+' ---- Teste de integracao com SAP real: clsSAP.TypedTable ponta a
+'      ponta. Requer sessao ja conectada e um Id de table control
+'      valido para o ambiente de teste; por depender de estado
+'      externo, nao entra em RunAllComponentsTests - chame manualmente.
+'      Tambem serve para confirmar as tres suposicoes de risco
+'      documentadas em Components/clsSAPTable.cls (GetCell por linha
+'      relativa, VerticalScrollbar.Position, Columns(i).Title). ----
+Public Sub Test_TypedTable_ComSessaoReal_Integracao(ByVal SAP As clsSAP, ByVal TableId As String)
+    Dim tbl As clsSAPTable
+    Set tbl = SAP.TypedTable(TableId)
+
+    Assert Not tbl Is Nothing, "TypedTable deve retornar um clsSAPTable valido"
+    Assert tbl.Id = TableId, "TypedTable.Id deve ser o Id informado"
+    Debug.Print "  RowCount=" & tbl.RowCount & " VisibleRowCount=" & tbl.VisibleRowCount & " ColumnCount=" & tbl.ColumnCount
+    If tbl.RowCount > 0 Then
+        Debug.Print "  Linha 0, coluna 0: '" & tbl.GetCellValue(0, 0) & "'"
+    End If
 End Sub
 
 ' ---- Utilitario minimo de assercao para os testes acima ----
