@@ -30,6 +30,9 @@ export function QuestionnaireScreen({ navigation, route }: TriageScreenProps<"Qu
   if (!questions || steps.length === 0) {
     return <ErrorView message="Não encontramos perguntas para esta categoria no momento." onRetry={refetch} />;
   }
+  // Narrowed above (guarded by the early return); rebound so nested
+  // closures below keep the non-null type instead of `T | null`.
+  const allQuestions = questions;
 
   const currentStep = steps[stepIndex];
   const isLastStep = stepIndex === steps.length - 1;
@@ -48,7 +51,7 @@ export function QuestionnaireScreen({ navigation, route }: TriageScreenProps<"Qu
     }
     setAttemptedAdvance(false);
     if (isLastStep) {
-      navigation.navigate("Identification", { category, questions, answers });
+      navigation.navigate("Identification", { category, questions: allQuestions, answers });
     } else {
       setStepIndex((i) => i + 1);
     }
