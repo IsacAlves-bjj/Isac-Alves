@@ -146,6 +146,20 @@ export interface PatientFeedback {
   createdAt: string;
 }
 
+export type ReferralStatus = "SOLICITADO" | "REALIZADO";
+
+export interface Referral {
+  id: string;
+  patientId: string;
+  specialty: string;
+  reason: string | null;
+  status: ReferralStatus;
+  requestedAt: string;
+  notes: string | null;
+}
+
+export type PatientLocation = "Consultório" | "Domiciliar" | "Teleconsulta";
+
 export interface SessionsSummary {
   planned: number | null;
   completed: number;
@@ -161,6 +175,10 @@ export interface Patient {
   document: string | null;
   address: string | null;
   notes: string | null;
+  weight: number | null;
+  height: number | null;
+  comorbidities: string | null;
+  preferredLocation: PatientLocation | null;
   leadId: string | null;
   lead?: Lead | null;
   appointments?: Appointment[];
@@ -169,6 +187,7 @@ export interface Patient {
   transactions?: Transaction[];
   examRequests?: ExamRequest[];
   feedbacks?: PatientFeedback[];
+  referrals?: Referral[];
   sessionsSummary?: SessionsSummary;
   createdAt: string;
   updatedAt: string;

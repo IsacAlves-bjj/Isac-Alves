@@ -33,7 +33,7 @@ export function AppointmentForm({
   const [patientId, setPatientId] = useState(fixedPatient?.id ?? "");
   const [startsAt, setStartsAt] = useState(defaultStart ?? "");
   const [duration, setDuration] = useState(50);
-  const [location, setLocation] = useState(LOCATIONS[0]);
+  const [location, setLocation] = useState(fixedPatient?.preferredLocation ?? LOCATIONS[0]);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

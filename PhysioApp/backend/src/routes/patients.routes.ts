@@ -17,6 +17,10 @@ const patientSchema = z.object({
   document: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  weight: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  comorbidities: z.string().optional(),
+  preferredLocation: z.enum(["Consultório", "Domiciliar", "Teleconsulta"]).optional(),
 });
 
 patientsRouter.get(
@@ -61,6 +65,7 @@ patientsRouter.get(
         transactions: { orderBy: { dueDate: "desc" } },
         examRequests: { orderBy: { requestedAt: "desc" } },
         feedbacks: { orderBy: { createdAt: "desc" } },
+        referrals: { orderBy: { requestedAt: "desc" } },
         lead: true,
       },
     });
@@ -102,27 +107,67 @@ const treatmentPlanSchema = z.object({
   sessionsPlanned: z.number().int().positive().optional(),
 });
 
+// Desativa o plano ativo anterior (se houver) e cria um novo — reaproveitado
+// tanto por POST /treatment-plan quanto por POST /close-package, que além
+// do plano também fecha o lançamento financeiro do pacote.
+async function createActiveTreatmentPlan(
+  patientId: string,
+  data: z.infer<typeof treatmentPlanSchema>
+) {
+  await prisma.treatmentPlan.updateMany({
+    where: { patientId, active: true },
+    data: { active: false },
+  });
+
+  return prisma.treatmentPlan.create({
+    data: {
+      patientId,
+      goal: data.goal,
+      careLine: data.careLine,
+      sessionsPlanned: data.sessionsPlanned,
+      startDate: data.startDate ? new Date(data.startDate) : new Date(),
+    },
+  });
+}
+
 // Cria um novo plano de tratamento ativo para o paciente, desativando o
 // anterior (se houver) — mantém o histórico em vez de sobrescrever.
 patientsRouter.post(
   "/:id/treatment-plan",
   asyncHandler(async (req, res) => {
     const data = treatmentPlanSchema.parse(req.body);
-
-    await prisma.treatmentPlan.updateMany({
-      where: { patientId: req.params.id, active: true },
-      data: { active: false },
-    });
-
-    const plan = await prisma.treatmentPlan.create({
-      data: {
-        patientId: req.params.id,
-        goal: data.goal,
-        careLine: data.careLine,
-        sessionsPlanned: data.sessionsPlanned,
-        startDate: data.startDate ? new Date(data.startDate) : new Date(),
-      },
-    });
+    const plan = await createActiveTreatmentPlan(req.params.id, data);
     res.status(201).json(plan);
+  })
+);
+
+const closePackageSchema = treatmentPlanSchema.extend({
+  sessionsPlanned: z.number().int().positive(), // obrigatório ao fechar pacote
+  price: z.number().positive().optional(), // se informado, já lança a conta a receber
+});
+
+// "Fechar pacote": registra o plano de tratamento (nº de sessões) e, se um
+// valor for informado, já lança a conta a receber correspondente — a ação
+// comercial de fechar um pacote com o paciente em um único passo.
+patientsRouter.post(
+  "/:id/close-package",
+  asyncHandler(async (req, res) => {
+    const data = closePackageSchema.parse(req.body);
+    const plan = await createActiveTreatmentPlan(req.params.id, data);
+
+    let transaction = null;
+    if (data.price) {
+      transaction = await prisma.transaction.create({
+        data: {
+          type: "RECEIVABLE",
+          description: `Pacote ${data.sessionsPlanned} sessões`,
+          amount: data.price,
+          dueDate: plan.startDate ?? new Date(),
+          patientId: req.params.id,
+        },
+      });
+    }
+
+    res.status(201).json({ plan, transaction });
   })
 );

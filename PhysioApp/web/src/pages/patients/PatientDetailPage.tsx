@@ -8,6 +8,7 @@ import type {
   ExamRequest,
   Patient,
   PatientFeedback,
+  Referral,
   TreatmentPlan,
 } from "../../api/types";
 import { LoadState } from "../../components/LoadState";
@@ -19,15 +20,20 @@ import { ClinicalRecordForm } from "../../components/ClinicalRecordForm";
 import type { ClinicalRecordFormValues } from "../../components/ClinicalRecordForm";
 import { TreatmentPlanForm } from "../../components/TreatmentPlanForm";
 import type { TreatmentPlanFormValues } from "../../components/TreatmentPlanForm";
+import { ClosePackageForm } from "../../components/ClosePackageForm";
+import type { ClosePackageFormValues } from "../../components/ClosePackageForm";
 import { ExamRequestForm } from "../../components/ExamRequestForm";
 import type { ExamRequestFormValues } from "../../components/ExamRequestForm";
+import { ReferralForm } from "../../components/ReferralForm";
+import type { ReferralFormValues } from "../../components/ReferralForm";
 import { FeedbackForm } from "../../components/FeedbackForm";
 import type { FeedbackFormValues } from "../../components/FeedbackForm";
+import { PainTrendChart } from "../../components/PainTrendChart";
 import { AppointmentStatusBadge, Badge } from "../../components/Badge";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/format";
 import { Modal } from "../../components/Modal";
 
-type TabKey = "visao-geral" | "agendamentos" | "prontuario" | "exames" | "feedback";
+type TabKey = "visao-geral" | "agendamentos" | "prontuario" | "exames" | "encaminhamentos" | "feedback";
 
 export function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -38,8 +44,11 @@ export function PatientDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showNewAppointment, setShowNewAppointment] = useState(false);
   const [showTreatmentPlan, setShowTreatmentPlan] = useState(false);
+  const [showClosePackage, setShowClosePackage] = useState(false);
   const [receivingExamId, setReceivingExamId] = useState<string | null>(null);
   const [resultNotes, setResultNotes] = useState("");
+  const [completingReferralId, setCompletingReferralId] = useState<string | null>(null);
+  const [referralNotes, setReferralNotes] = useState("");
   const [sendingConfirmationId, setSendingConfirmationId] = useState<string | null>(null);
 
   async function load() {
@@ -87,6 +96,13 @@ export function PatientDetailPage() {
     await load();
   }
 
+  async function handleClosePackage(values: ClosePackageFormValues) {
+    if (!id) return;
+    await api.post(`/patients/${id}/close-package`, values);
+    setShowClosePackage(false);
+    await load();
+  }
+
   async function handleCreateExamRequest(values: ExamRequestFormValues) {
     if (!id) return;
     await api.post<ExamRequest>("/exam-requests", { patientId: id, ...values });
@@ -98,6 +114,20 @@ export function PatientDetailPage() {
     await api.patch<ExamRequest>(`/exam-requests/${examId}/receive`, { resultNotes: resultNotes || undefined });
     setReceivingExamId(null);
     setResultNotes("");
+    await load();
+  }
+
+  async function handleCreateReferral(values: ReferralFormValues) {
+    if (!id) return;
+    await api.post<Referral>("/referrals", { patientId: id, ...values });
+    await load();
+  }
+
+  async function handleCompleteReferral(referralId: string, event: FormEvent) {
+    event.preventDefault();
+    await api.patch<Referral>(`/referrals/${referralId}/complete`, { notes: referralNotes || undefined });
+    setCompletingReferralId(null);
+    setReferralNotes("");
     await load();
   }
 
@@ -120,6 +150,7 @@ export function PatientDetailPage() {
   const appointments = patient?.appointments ?? [];
   const clinicalRecords = patient?.clinicalRecords ?? [];
   const examRequests = patient?.examRequests ?? [];
+  const referrals = patient?.referrals ?? [];
   const feedbacks = patient?.feedbacks ?? [];
   const activePlan = patient?.treatmentPlans?.find((p) => p.active) ?? patient?.treatmentPlans?.[0];
   const recordedAppointmentIds = new Set(clinicalRecords.map((r) => r.appointmentId));
@@ -149,6 +180,9 @@ export function PatientDetailPage() {
               </button>
               <button type="button" className={tab === "exames" ? "tab tab-active" : "tab"} onClick={() => setTab("exames")}>
                 Exames ({examRequests.length})
+              </button>
+              <button type="button" className={tab === "encaminhamentos" ? "tab tab-active" : "tab"} onClick={() => setTab("encaminhamentos")}>
+                Encaminhamentos ({referrals.length})
               </button>
               <button type="button" className={tab === "feedback" ? "tab tab-active" : "tab"} onClick={() => setTab("feedback")}>
                 Feedback ({feedbacks.length})
@@ -185,6 +219,20 @@ export function PatientDetailPage() {
                       <div>
                         <dt>Endereço</dt>
                         <dd>{patient.address ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Peso / Altura</dt>
+                        <dd>
+                          {patient.weight ? `${patient.weight} kg` : "—"} / {patient.height ? `${patient.height} cm` : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Comorbidades</dt>
+                        <dd>{patient.comorbidities ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Atendimento preferido</dt>
+                        <dd>{patient.preferredLocation ?? "—"}</dd>
                       </div>
                       <div>
                         <dt>Observações</dt>
@@ -226,9 +274,14 @@ export function PatientDetailPage() {
                   <section className="card">
                     <div className="card-title-row">
                       <h2>Tratamento</h2>
-                      <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowTreatmentPlan(true)}>
-                        {activePlan ? "Atualizar" : "Iniciar"}
-                      </button>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowTreatmentPlan(true)}>
+                          {activePlan ? "Atualizar" : "Iniciar"}
+                        </button>
+                        <button type="button" className="btn btn-primary btn-small" onClick={() => setShowClosePackage(true)}>
+                          Fechar pacote
+                        </button>
+                      </div>
                     </div>
                     {!activePlan ? (
                       <p className="muted">Nenhum plano de tratamento registrado.</p>
@@ -314,6 +367,10 @@ export function PatientDetailPage() {
             {tab === "prontuario" && (
               <div className="detail-grid">
                 <div className="detail-main">
+                  <section className="card">
+                    <h2>Evolução da dor</h2>
+                    <PainTrendChart records={clinicalRecords} />
+                  </section>
                   <section className="card">
                     <h2>Histórico de evoluções</h2>
                     {clinicalRecords.length === 0 ? (
@@ -423,6 +480,72 @@ export function PatientDetailPage() {
               </div>
             )}
 
+            {tab === "encaminhamentos" && (
+              <div className="detail-grid">
+                <div className="detail-main">
+                  <section className="card">
+                    <h2>Encaminhamentos</h2>
+                    {referrals.length === 0 ? (
+                      <p className="muted">Nenhum encaminhamento registrado ainda.</p>
+                    ) : (
+                      referrals.map((ref) => (
+                        <article key={ref.id} className="record-item">
+                          <header>
+                            <strong>{ref.specialty}</strong>
+                            <Badge tone={ref.status === "REALIZADO" ? "success" : "warning"}>
+                              {ref.status === "REALIZADO" ? "Realizado" : "Solicitado"}
+                            </Badge>
+                          </header>
+                          <p className="muted small">Solicitado em {formatDateTime(ref.requestedAt)}</p>
+                          {ref.reason && <p>{ref.reason}</p>}
+                          {ref.notes && <p className="muted small">Retorno: {ref.notes}</p>}
+                          {ref.status === "SOLICITADO" && completingReferralId !== ref.id && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-small"
+                              onClick={() => {
+                                setCompletingReferralId(ref.id);
+                                setReferralNotes("");
+                              }}
+                            >
+                              Marcar como realizado
+                            </button>
+                          )}
+                          {completingReferralId === ref.id && (
+                            <form className="form" onSubmit={(e) => handleCompleteReferral(ref.id, e)} style={{ marginTop: 8 }}>
+                              <label className="field">
+                                <span className="label">Retorno / observações (opcional)</span>
+                                <textarea
+                                  className="input"
+                                  rows={2}
+                                  value={referralNotes}
+                                  onChange={(e) => setReferralNotes(e.target.value)}
+                                />
+                              </label>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button type="submit" className="btn btn-primary btn-small">
+                                  Confirmar
+                                </button>
+                                <button type="button" className="btn btn-secondary btn-small" onClick={() => setCompletingReferralId(null)}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </article>
+                      ))
+                    )}
+                  </section>
+                </div>
+                <div className="detail-side">
+                  <section className="card">
+                    <h2>Novo encaminhamento</h2>
+                    <ReferralForm onSubmit={handleCreateReferral} />
+                  </section>
+                </div>
+              </div>
+            )}
+
             {tab === "feedback" && (
               <div className="detail-grid">
                 <div className="detail-main">
@@ -470,6 +593,12 @@ export function PatientDetailPage() {
       {showTreatmentPlan && patient && (
         <Modal title={activePlan ? "Atualizar plano de tratamento" : "Iniciar plano de tratamento"} onClose={() => setShowTreatmentPlan(false)}>
           <TreatmentPlanForm initial={activePlan} onSubmit={handleCreateTreatmentPlan} />
+        </Modal>
+      )}
+
+      {showClosePackage && patient && (
+        <Modal title="Fechar pacote" onClose={() => setShowClosePackage(false)}>
+          <ClosePackageForm onSubmit={handleClosePackage} />
         </Modal>
       )}
     </div>

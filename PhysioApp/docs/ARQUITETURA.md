@@ -56,7 +56,11 @@ Ver `backend/prisma/schema.prisma` para a fonte de verdade. Resumo das
 entidades principais:
 
 - **User** — fisioterapeuta/equipe do painel (login, role).
-- **Patient** — cadastro definitivo, com link opcional para o `Lead` que o originou.
+- **Patient** — cadastro definitivo, com link opcional para o `Lead` que o
+  originou. Além dos dados de contato, guarda peso/altura, comorbidades
+  (texto livre) e local de atendimento preferido (`Consultório`/
+  `Domiciliar`/`Teleconsulta` — só uma sugestão de preenchimento ao criar
+  agendamento, cada sessão pode ter local diferente do preferido).
 - **TriageCategory** / **TriageQuestion** — catálogo configurável das
   "caixinhas" e perguntas (gerais + por categoria), conforme `TRIAGEM.md`.
 - **Lead** — pré-triagem enviada pelo app: identificação, categoria,
@@ -74,6 +78,10 @@ entidades principais:
   poderia dessincronizar).
 - **ExamRequest** — exame solicitado ao paciente (descrição, status
   `SOLICITADO`/`RECEBIDO`, resumo do resultado quando recebido).
+- **Referral** — encaminhamento a outro profissional/especialidade (texto
+  livre, ex.: "Ortopedista"), status `SOLICITADO`/`REALIZADO`, com retorno
+  registrado quando concluído. Mesmo padrão de `ExamRequest`, mas para
+  referência externa em vez de exame.
 - **PatientFeedback** — feedback de satisfação relatado pelo paciente
   (nota 1-5 + comentário), separado do prontuário por não ser dado
   clínico.
@@ -94,6 +102,13 @@ entidades principais:
 confirmação" na ficha do paciente registra esse timestamp e loga no
 console — disparo real por SMS/WhatsApp é integração futura, mesmo
 padrão do OTP em `auth.routes.ts`.
+
+**Fechar pacote**: `POST /patients/:id/close-package` combina em um único
+passo o que normalmente seriam duas ações separadas — cria o
+`TreatmentPlan` (com nº de sessões do pacote) e, se um valor for
+informado, já lança o `Transaction` (`RECEIVABLE`) correspondente. Reaproveita
+a mesma função de criação de plano usada por `POST /treatment-plan`, sem
+duplicar a lógica de desativar o plano anterior.
 
 ## 4. Fluxo ponta a ponta
 

@@ -12,7 +12,13 @@ export interface PatientFormValues {
   document?: string;
   address?: string;
   notes?: string;
+  weight?: number;
+  height?: number;
+  comorbidities?: string;
+  preferredLocation?: "Consultório" | "Domiciliar" | "Teleconsulta";
 }
+
+const LOCATIONS = ["Consultório", "Domiciliar", "Teleconsulta"] as const;
 
 // Formulário reaproveitado no cadastro (PatientsListPage → novo) e na edição
 // da ficha (PatientDetailPage) — mesmos campos, muda só o submit.
@@ -32,6 +38,10 @@ export function PatientForm({
   const [document, setDocument] = useState(initial?.document ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [weight, setWeight] = useState(initial?.weight != null ? String(initial.weight) : "");
+  const [height, setHeight] = useState(initial?.height != null ? String(initial.height) : "");
+  const [comorbidities, setComorbidities] = useState(initial?.comorbidities ?? "");
+  const [preferredLocation, setPreferredLocation] = useState(initial?.preferredLocation ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -48,6 +58,10 @@ export function PatientForm({
         document: document || undefined,
         address: address || undefined,
         notes: notes || undefined,
+        weight: weight ? Number(weight) : undefined,
+        height: height ? Number(height) : undefined,
+        comorbidities: comorbidities || undefined,
+        preferredLocation: (preferredLocation as PatientFormValues["preferredLocation"]) || undefined,
       });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao salvar paciente.");
@@ -85,7 +99,31 @@ export function PatientForm({
           <span className="label">Endereço</span>
           <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
         </label>
+        <label className="field field-narrow">
+          <span className="label">Peso (kg)</span>
+          <input className="input" type="number" step="0.1" min="0" value={weight} onChange={(e) => setWeight(e.target.value)} />
+        </label>
+        <label className="field field-narrow">
+          <span className="label">Altura (cm)</span>
+          <input className="input" type="number" step="1" min="0" value={height} onChange={(e) => setHeight(e.target.value)} />
+        </label>
+        <label className="field">
+          <span className="label">Atendimento preferido</span>
+          <select className="input" value={preferredLocation} onChange={(e) => setPreferredLocation(e.target.value)}>
+            <option value="">Sem preferência</option>
+            {LOCATIONS.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+
+      <label className="field">
+        <span className="label">Comorbidades</span>
+        <input className="input" placeholder="Ex.: Diabetes, hipertensão" value={comorbidities} onChange={(e) => setComorbidities(e.target.value)} />
+      </label>
 
       <label className="field">
         <span className="label">Observações</span>

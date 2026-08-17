@@ -113,6 +113,8 @@ model LeadAnswer {
 // Pacientes
 // ---------------------------------------------------------------------
 
+// preferredLocation: "Consultório" | "Domiciliar" | "Teleconsulta" — só uma
+// sugestão de preenchimento ao criar um novo agendamento, não trava nada.
 model Patient {
   id      String  @id @default(cuid())
   name    String
@@ -122,6 +124,10 @@ model Patient {
   document  String? // CPF, opcional
   address   String?
   notes     String?
+  weight    Float? // kg
+  height    Float? // cm
+  comorbidities String? // texto livre: "Diabetes, hipertensão..."
+  preferredLocation String?
 
   leadId String? @unique
   lead   Lead?   @relation(fields: [leadId], references: [id])
@@ -132,6 +138,7 @@ model Patient {
   transactions    Transaction[]
   examRequests    ExamRequest[]
   feedbacks       PatientFeedback[]
+  referrals       Referral[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -165,6 +172,22 @@ model ExamRequest {
   requestedAt     DateTime  @default(now())
   resultNotes     String? // resumo do resultado, preenchido quando o paciente traz o exame
   resultReceivedAt DateTime?
+}
+
+// ---------------------------------------------------------------------
+// Encaminhamentos (referência a outro profissional/especialidade)
+// ---------------------------------------------------------------------
+
+// status: "SOLICITADO" | "REALIZADO"
+model Referral {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  specialty   String // ex.: "Ortopedista", "Nutricionista" — texto livre
+  reason      String?
+  status      String   @default("SOLICITADO")
+  requestedAt DateTime @default(now())
+  notes       String? // retorno/observações após o encaminhamento
 }
 
 // ---------------------------------------------------------------------

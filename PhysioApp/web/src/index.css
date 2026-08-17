@@ -811,6 +811,13 @@ textarea.input {
   margin: 8px 0;
 }
 
+/* Os pares dt/dd vêm agrupados em <div> (JSX) para semântica, mas o grid
+   acima precisa que dt/dd sejam os itens diretos — sem isto, cada <div>
+   vira uma única célula e o conteúdo se sobrepõe. */
+.soap-list > div {
+  display: contents;
+}
+
 .soap-list dt {
   font-weight: 700;
   color: var(--brand-dark);
