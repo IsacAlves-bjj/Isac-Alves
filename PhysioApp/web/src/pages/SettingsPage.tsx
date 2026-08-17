@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { api, ApiError } from "../api/client";
-import type { StaffUser } from "../api/types";
+import type { PriceListItem, StaffUser } from "../api/types";
 import { Avatar } from "../components/Avatar";
-import { formatDateTime } from "../utils/format";
+import { formatCurrency, formatDateTime } from "../utils/format";
 
 const AVATAR_MAX_SIZE = 320; // px — evita salvar fotos gigantes como texto no banco
 const PRICE_TABLE_MAX_BYTES = 4_000_000; // margem sob o limite de 6MB do backend (base64 infla ~33%)
@@ -62,6 +62,60 @@ export function SettingsPage() {
   const [uploadingPriceTable, setUploadingPriceTable] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const priceTableInputRef = useRef<HTMLInputElement>(null);
+
+  const [priceList, setPriceList] = useState<PriceListItem[]>([]);
+  const [priceListError, setPriceListError] = useState<string | null>(null);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemPrice, setNewItemPrice] = useState("");
+  const [savingItem, setSavingItem] = useState(false);
+
+  async function loadPriceList() {
+    try {
+      setPriceList(await api.get<PriceListItem[]>("/finance/price-list"));
+    } catch (err) {
+      setPriceListError(err instanceof ApiError ? err.message : "Erro ao carregar a tabela de preços.");
+    }
+  }
+
+  useEffect(() => {
+    loadPriceList();
+  }, []);
+
+  async function handleAddPriceItem(event: FormEvent) {
+    event.preventDefault();
+    setPriceListError(null);
+    setSavingItem(true);
+    try {
+      await api.post("/finance/price-list", { name: newItemName, price: Number(newItemPrice) });
+      setNewItemName("");
+      setNewItemPrice("");
+      await loadPriceList();
+    } catch (err) {
+      setPriceListError(err instanceof ApiError ? err.message : "Erro ao adicionar item.");
+    } finally {
+      setSavingItem(false);
+    }
+  }
+
+  async function handleTogglePriceItem(item: PriceListItem) {
+    setPriceListError(null);
+    try {
+      await api.patch(`/finance/price-list/${item.id}`, { active: !item.active });
+      await loadPriceList();
+    } catch (err) {
+      setPriceListError(err instanceof ApiError ? err.message : "Erro ao atualizar item.");
+    }
+  }
+
+  async function handleDeletePriceItem(item: PriceListItem) {
+    setPriceListError(null);
+    try {
+      await api.delete(`/finance/price-list/${item.id}`);
+      await loadPriceList();
+    } catch (err) {
+      setPriceListError(err instanceof ApiError ? err.message : "Erro ao remover item.");
+    }
+  }
 
   async function handleSaveProfile(event: FormEvent) {
     event.preventDefault();
@@ -179,6 +233,80 @@ export function SettingsPage() {
 
       <section className="card">
         <h2>Tabela de preços</h2>
+        <p className="muted">
+          Serviços e pacotes com valor de referência — aparecem para escolher rápido ao lançar uma
+          conta a receber ou fechar um pacote, sem precisar digitar o valor de novo toda vez.
+        </p>
+        {priceListError && <div className="alert alert-error" style={{ marginTop: 12 }}>{priceListError}</div>}
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Serviço</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {priceList.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="muted">Nenhum item cadastrado ainda.</td>
+                </tr>
+              ) : (
+                priceList.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.name}</td>
+                    <td>{formatCurrency(item.price)}</td>
+                    <td>
+                      <button type="button" className="btn btn-secondary btn-small" onClick={() => handleTogglePriceItem(item)}>
+                        {item.active ? "Ativo" : "Inativo"}
+                      </button>
+                    </td>
+                    <td>
+                      <button type="button" className="btn btn-secondary btn-small" onClick={() => handleDeletePriceItem(item)}>
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <form className="form" onSubmit={handleAddPriceItem} style={{ marginTop: 16 }}>
+          <div className="form-grid">
+            <label className="field">
+              <span className="label">Serviço *</span>
+              <input
+                className="input"
+                required
+                placeholder="Ex.: Sessão avulsa, Avaliação inicial"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+              />
+            </label>
+            <label className="field field-narrow">
+              <span className="label">Valor (R$) *</span>
+              <input
+                className="input"
+                type="number"
+                required
+                min={0.01}
+                step="0.01"
+                value={newItemPrice}
+                onChange={(e) => setNewItemPrice(e.target.value)}
+              />
+            </label>
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={savingItem}>
+            {savingItem ? "Adicionando..." : "+ Adicionar item"}
+          </button>
+        </form>
+      </section>
+
+      <section className="card">
+        <h2>Anexo da tabela de preços</h2>
         <p className="muted">
           Envie um PDF ou imagem com os valores de consulta e pacotes, para consulta rápida na hora
           de negociar com o paciente. Fica salva só neste painel — não é enviada automaticamente a

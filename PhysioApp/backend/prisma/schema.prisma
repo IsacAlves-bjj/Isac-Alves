@@ -275,6 +275,20 @@ model CashSession {
   transactions Transaction[]
 }
 
+// Tabela de preços padrão da clínica: serviços/pacotes com valor de
+// referência, usada para preencher rápido o valor ao lançar uma conta a
+// receber ou fechar um pacote — não é vinculada à transação (a transação
+// guarda seu próprio valor, editável), é só uma lista de apoio.
+model PriceListItem {
+  id       String  @id @default(cuid())
+  name     String // ex.: "Sessão avulsa", "Avaliação inicial", "Pacote 8 sessões"
+  price    Float
+  active   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Supplier {
   id       String  @id @default(cuid())
   name     String

@@ -9,6 +9,7 @@ import type {
   ExamRequest,
   Patient,
   PatientFeedback,
+  PriceListItem,
   Referral,
   TreatmentPlan,
 } from "../../api/types";
@@ -51,6 +52,7 @@ export function PatientDetailPage() {
   const [completingReferralId, setCompletingReferralId] = useState<string | null>(null);
   const [referralNotes, setReferralNotes] = useState("");
   const [sendingConfirmationId, setSendingConfirmationId] = useState<string | null>(null);
+  const [priceListItems, setPriceListItems] = useState<PriceListItem[]>([]);
 
   async function load() {
     if (!id) return;
@@ -70,6 +72,10 @@ export function PatientDetailPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    api.get<PriceListItem[]>("/finance/price-list").then(setPriceListItems).catch(() => {});
+  }, []);
 
   async function handleEdit(values: PatientFormValues) {
     if (!id) return;
@@ -610,7 +616,7 @@ export function PatientDetailPage() {
 
       {showClosePackage && patient && (
         <Modal title="Fechar pacote" onClose={() => setShowClosePackage(false)}>
-          <ClosePackageForm onSubmit={handleClosePackage} />
+          <ClosePackageForm priceListItems={priceListItems} onSubmit={handleClosePackage} />
         </Modal>
       )}
     </div>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError } from "../api/client";
 import { BILLING_TYPE_LABELS } from "../api/types";
-import type { BillingType, Patient, Supplier, TransactionType } from "../api/types";
+import type { BillingType, Patient, PriceListItem, Supplier, TransactionType } from "../api/types";
 import { localDateTimeToISO } from "../utils/format";
 
 export interface TransactionFormValues {
@@ -23,11 +23,13 @@ export function TransactionForm({
   type,
   patients,
   suppliers,
+  priceListItems,
   onSubmit,
 }: {
   type: TransactionType;
   patients?: Patient[];
   suppliers?: Supplier[];
+  priceListItems?: PriceListItem[];
   onSubmit: (values: TransactionFormValues) => Promise<void>;
 }) {
   const [description, setDescription] = useState("");
@@ -46,6 +48,15 @@ export function TransactionForm({
     setPatientId(id);
     const patient = patients?.find((p) => p.id === id);
     if (patient) setBillingType(patient.billingType);
+  }
+
+  // Selecionar um item da tabela de preços preenche descrição e valor —
+  // continuam editáveis depois, é só um atalho para não digitar de novo.
+  function handlePriceItemChange(id: string) {
+    const item = priceListItems?.find((i) => i.id === id);
+    if (!item) return;
+    setDescription(item.name);
+    setAmount(String(item.price));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -119,6 +130,20 @@ export function TransactionForm({
             {suppliers?.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {type === "RECEIVABLE" && priceListItems && priceListItems.filter((i) => i.active).length > 0 && (
+        <label className="field">
+          <span className="label">Serviço (tabela de preços)</span>
+          <select className="input" defaultValue="" onChange={(e) => handlePriceItemChange(e.target.value)}>
+            <option value="">Preencher manualmente...</option>
+            {priceListItems.filter((i) => i.active).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} — {item.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </option>
             ))}
           </select>

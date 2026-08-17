@@ -10,11 +10,12 @@ import { Modal } from "../../components/Modal";
 import { Badge, TransactionStatusBadge } from "../../components/Badge";
 import { formatCurrency, formatDate } from "../../utils/format";
 import { BILLING_TYPE_LABELS } from "../../api/types";
-import type { PaymentMethod } from "../../api/types";
+import type { PaymentMethod, PriceListItem } from "../../api/types";
 
 export function ReceivablesPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [priceListItems, setPriceListItems] = useState<PriceListItem[]>([]);
   const [cashSessionId, setCashSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +27,15 @@ export function ReceivablesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [txs, pts, current] = await Promise.all([
+      const [txs, pts, items, current] = await Promise.all([
         api.get<Transaction[]>("/finance/transactions?type=RECEIVABLE"),
         api.get<Patient[]>("/patients"),
+        api.get<PriceListItem[]>("/finance/price-list"),
         api.get<CashSession | null>("/finance/cash-sessions/current"),
       ]);
       setTransactions(txs);
       setPatients(pts);
+      setPriceListItems(items);
       setCashSessionId(current?.id ?? null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao carregar contas a receber.");
@@ -122,7 +125,7 @@ export function ReceivablesPage() {
 
       {showForm && (
         <Modal title="Nova conta a receber" onClose={() => setShowForm(false)}>
-          <TransactionForm type="RECEIVABLE" patients={patients} onSubmit={handleCreate} />
+          <TransactionForm type="RECEIVABLE" patients={patients} priceListItems={priceListItems} onSubmit={handleCreate} />
         </Modal>
       )}
 

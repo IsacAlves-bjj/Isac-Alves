@@ -108,6 +108,13 @@ entidades principais:
   gerar um novo número, usando `User.document` (CPF/CNPJ cadastrado em
   Configurações) como emitente.
 - **Supplier** — fornecedores (nome, categoria de despesa, contato).
+- **PriceListItem** — tabela de preços padrão da clínica (serviço/pacote +
+  valor de referência, `active` para desativar sem apagar histórico). Não
+  é vinculada à transação — é só uma lista de apoio para preencher rápido
+  descrição/valor ao lançar uma conta a receber ou fechar um pacote;
+  depois de selecionada, os campos continuam editáveis normalmente.
+  Distinta do anexo de tabela de preços (`User.priceTableUrl`), que é um
+  arquivo (PDF/imagem) de referência, não dados estruturados.
 
 `Appointment` também guarda `confirmationSentAt`: o botão "Enviar
 confirmação" na ficha do paciente registra esse timestamp e loga no

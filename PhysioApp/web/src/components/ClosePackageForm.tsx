@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError } from "../api/client";
+import type { PriceListItem } from "../api/types";
 import { isoToLocalDateInput } from "../utils/format";
 
 export interface ClosePackageFormValues {
@@ -14,7 +15,13 @@ export interface ClosePackageFormValues {
 // Ação comercial de fechar um pacote de sessões: registra o plano de
 // tratamento e, se um valor for informado, já lança a conta a receber —
 // ver POST /patients/:id/close-package no backend.
-export function ClosePackageForm({ onSubmit }: { onSubmit: (values: ClosePackageFormValues) => Promise<void> }) {
+export function ClosePackageForm({
+  priceListItems,
+  onSubmit,
+}: {
+  priceListItems?: PriceListItem[];
+  onSubmit: (values: ClosePackageFormValues) => Promise<void>;
+}) {
   const [goal, setGoal] = useState("");
   const [careLine, setCareLine] = useState("");
   const [startDate, setStartDate] = useState(isoToLocalDateInput(new Date().toISOString()));
@@ -22,6 +29,13 @@ export function ClosePackageForm({ onSubmit }: { onSubmit: (values: ClosePackage
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Selecionar um item da tabela de preços preenche o valor do pacote —
+  // continua editável depois, é só um atalho.
+  function handlePriceItemChange(id: string) {
+    const item = priceListItems?.find((i) => i.id === id);
+    if (item) setPrice(String(item.price));
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -55,6 +69,20 @@ export function ClosePackageForm({ onSubmit }: { onSubmit: (values: ClosePackage
         <span className="label">Linha de cuidado *</span>
         <textarea className="input" rows={3} required value={careLine} onChange={(e) => setCareLine(e.target.value)} />
       </label>
+
+      {priceListItems && priceListItems.filter((i) => i.active).length > 0 && (
+        <label className="field">
+          <span className="label">Serviço (tabela de preços)</span>
+          <select className="input" defaultValue="" onChange={(e) => handlePriceItemChange(e.target.value)}>
+            <option value="">Preencher manualmente...</option>
+            {priceListItems.filter((i) => i.active).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} — {item.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="form-grid">
         <label className="field">

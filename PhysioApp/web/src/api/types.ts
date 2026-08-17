@@ -223,6 +223,13 @@ export const BILLING_TYPE_LABELS: Record<BillingType, string> = {
   CONVENIO: "Convênio",
 };
 
+export interface PriceListItem {
+  id: string;
+  name: string;
+  price: number;
+  active: boolean;
+}
+
 export interface Supplier {
   id: string;
   name: string;

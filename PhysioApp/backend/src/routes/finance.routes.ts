@@ -34,6 +34,48 @@ financeRouter.post(
   })
 );
 
+// --- Tabela de preços padrão -------------------------------------------
+// Lista de serviços/pacotes com valor de referência, usada para preencher
+// rápido o valor ao lançar conta a receber ou fechar pacote (ver
+// PriceListItem no schema — não é vinculada à transação em si).
+
+const priceListItemSchema = z.object({
+  name: z.string().min(2),
+  price: z.number().positive(),
+  active: z.boolean().optional(),
+});
+
+financeRouter.get(
+  "/price-list",
+  asyncHandler(async (_req, res) => {
+    res.json(await prisma.priceListItem.findMany({ orderBy: { name: "asc" } }));
+  })
+);
+
+financeRouter.post(
+  "/price-list",
+  asyncHandler(async (req, res) => {
+    const data = priceListItemSchema.parse(req.body);
+    res.status(201).json(await prisma.priceListItem.create({ data }));
+  })
+);
+
+financeRouter.patch(
+  "/price-list/:id",
+  asyncHandler(async (req, res) => {
+    const data = priceListItemSchema.partial().parse(req.body);
+    res.json(await prisma.priceListItem.update({ where: { id: req.params.id }, data }));
+  })
+);
+
+financeRouter.delete(
+  "/price-list/:id",
+  asyncHandler(async (req, res) => {
+    await prisma.priceListItem.delete({ where: { id: req.params.id } });
+    res.status(204).end();
+  })
+);
+
 // --- Caixa (abertura/fechamento) --------------------------------------
 
 const openCashSchema = z.object({ openingBalance: z.number().min(0) });
