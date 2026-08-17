@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../middleware/errorHandler";
 import { AppError } from "../utils/AppError";
-import { signPatientToken, signStaffToken } from "../middleware/auth";
+import { requireAuth, signPatientToken, signStaffToken } from "../middleware/auth";
 
 export const authRouter = Router();
 
@@ -29,7 +29,7 @@ authRouter.post(
     const token = signStaffToken(user.id, user.role as "ADMIN" | "FISIOTERAPEUTA");
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, document: user.document },
     });
   })
 );
@@ -48,6 +48,34 @@ authRouter.post(
     // TODO(integração futura): disparar SMS real via provedor (ex.: Twilio/Zenvia).
     console.log(`[OTP] Código de verificação para ${phone}: ${process.env.PATIENT_OTP_DEV ?? "123456"}`);
     res.json({ sent: true });
+  })
+);
+
+// --- Perfil da equipe (dados usados como emitente nos recibos) ------
+
+authRouter.get(
+  "/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (req.auth?.kind !== "staff") throw new AppError("Acesso restrito à equipe", 403);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: req.auth.sub } });
+    res.json({ id: user.id, name: user.name, email: user.email, role: user.role, document: user.document });
+  })
+);
+
+const updateMeSchema = z.object({
+  name: z.string().min(1).optional(),
+  document: z.string().optional(),
+});
+
+authRouter.patch(
+  "/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (req.auth?.kind !== "staff") throw new AppError("Acesso restrito à equipe", 403);
+    const data = updateMeSchema.parse(req.body);
+    const user = await prisma.user.update({ where: { id: req.auth.sub }, data });
+    res.json({ id: user.id, name: user.name, email: user.email, role: user.role, document: user.document });
   })
 );
 

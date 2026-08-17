@@ -67,14 +67,33 @@ entidades principais:
 - **ClinicalRecord** — evolução clínica de uma sessão realizada (SOAP:
   subjetivo, objetivo, avaliação, plano), vinculada a `Appointment`.
 - **TreatmentPlan** — plano terapêutico vigente do paciente (objetivo,
-  linha de cuidado, nº de sessões previstas).
+  linha de cuidado, início do tratamento, nº de sessões previstas). Criar
+  um novo plano desativa o anterior, preservando o histórico. O nº de
+  sessões *realizadas* não é armazenado — é sempre calculado a partir da
+  contagem de `ClinicalRecord` do paciente (evita dado duplicado que
+  poderia dessincronizar).
+- **ExamRequest** — exame solicitado ao paciente (descrição, status
+  `SOLICITADO`/`RECEBIDO`, resumo do resultado quando recebido).
+- **PatientFeedback** — feedback de satisfação relatado pelo paciente
+  (nota 1-5 + comentário), separado do prontuário por não ser dado
+  clínico.
 - **CashSession** — abertura/fechamento de caixa (data, saldo inicial,
   saldo final, responsável).
 - **Transaction** — lançamento financeiro genérico: `type`
   (`receivable`/`payable`), status (`pending/paid/overdue/cancelled`),
-  valor, vencimento, vinculado opcionalmente a `Patient` (recebível) ou
-  `Supplier` (pagável) e a `CashSession` quando baixado em caixa.
+  forma de pagamento (`dinheiro/pix/cartao_credito/cartao_debito/transferencia`),
+  vinculado opcionalmente a `Patient` (recebível) ou `Supplier` (pagável)
+  e a `CashSession` quando baixado em caixa.
+- **Receipt** — recibo de uma `Transaction` recebível já paga. Emitido
+  uma única vez por transação — reemitir retorna o mesmo recibo em vez de
+  gerar um novo número, usando `User.document` (CPF/CNPJ cadastrado em
+  Configurações) como emitente.
 - **Supplier** — fornecedores (nome, categoria de despesa, contato).
+
+`Appointment` também guarda `confirmationSentAt`: o botão "Enviar
+confirmação" na ficha do paciente registra esse timestamp e loga no
+console — disparo real por SMS/WhatsApp é integração futura, mesmo
+padrão do OTP em `auth.routes.ts`.
 
 ## 4. Fluxo ponta a ponta
 

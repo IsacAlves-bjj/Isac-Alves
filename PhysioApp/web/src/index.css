@@ -893,6 +893,40 @@ textarea.input {
   }
 }
 
+/* ----- Recibo / impressão -------------------------------------------- */
+
+.receipt {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  background: var(--surface);
+}
+
+.receipt-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area,
+  .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    border: none;
+  }
+}
+
 /* ----- Modal ---------------------------------------------------------- */
 
 .modal-overlay {

@@ -151,7 +151,7 @@ financeRouter.post(
 );
 
 const paySchema = z.object({
-  paymentMethod: z.enum(["dinheiro", "pix", "cartao", "transferencia"]),
+  paymentMethod: z.enum(["dinheiro", "pix", "cartao_credito", "cartao_debito", "transferencia"]),
   cashSessionId: z.string().optional(),
 });
 
@@ -169,5 +169,54 @@ financeRouter.post(
       },
     });
     res.json(transaction);
+  })
+);
+
+// --- Recibos ------------------------------------------------------------
+// Um recibo só existe para uma conta a receber já paga. Emitir de novo
+// retorna o mesmo recibo (mesma data de emissão) em vez de criar outro.
+
+async function buildReceiptPayload(transactionId: string) {
+  const receipt = await prisma.receipt.findUnique({
+    where: { transactionId },
+    include: {
+      transaction: { include: { patient: true } },
+    },
+  });
+  if (!receipt) return null;
+
+  return {
+    id: receipt.id,
+    number: receipt.id.slice(-6).toUpperCase(),
+    issuedAt: receipt.issuedAt,
+    transaction: receipt.transaction,
+  };
+}
+
+financeRouter.get(
+  "/transactions/:id/receipt",
+  asyncHandler(async (req, res) => {
+    const payload = await buildReceiptPayload(req.params.id);
+    if (!payload) throw new AppError("Recibo ainda não emitido para esta conta", 404);
+    res.json(payload);
+  })
+);
+
+financeRouter.post(
+  "/transactions/:id/receipt",
+  asyncHandler(async (req, res) => {
+    const transaction = await prisma.transaction.findUnique({ where: { id: req.params.id } });
+    if (!transaction) throw new AppError("Conta não encontrada", 404);
+    if (transaction.type !== "RECEIVABLE") throw new AppError("Recibo só se aplica a contas a receber", 400);
+    if (transaction.status !== "PAID") throw new AppError("Só é possível emitir recibo de uma conta já paga", 400);
+
+    await prisma.receipt.upsert({
+      where: { transactionId: transaction.id },
+      update: {},
+      create: { transactionId: transaction.id },
+    });
+
+    const payload = await buildReceiptPayload(transaction.id);
+    res.status(201).json(payload);
   })
 );

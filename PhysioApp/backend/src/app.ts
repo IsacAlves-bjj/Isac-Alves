@@ -9,6 +9,8 @@ import { appointmentsRouter } from "./routes/appointments.routes";
 import { clinicalRecordsRouter } from "./routes/clinicalRecords.routes";
 import { financeRouter } from "./routes/finance.routes";
 import { dashboardRouter } from "./routes/dashboard.routes";
+import { examRequestsRouter } from "./routes/examRequests.routes";
+import { feedbackRouter } from "./routes/feedback.routes";
 
 export const app = express();
 
@@ -25,6 +27,8 @@ app.use("/appointments", appointmentsRouter);
 app.use("/clinical-records", clinicalRecordsRouter);
 app.use("/finance", financeRouter);
 app.use("/dashboard", dashboardRouter);
+app.use("/exam-requests", examRequestsRouter);
+app.use("/feedback", feedbackRouter);
 
 // Sempre por último: captura erros lançados por qualquer rota acima.
 app.use(errorHandler);

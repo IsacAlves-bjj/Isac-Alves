@@ -1,14 +1,10 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError } from "../api/client";
+import { PAYMENT_METHOD_LABELS } from "../api/types";
 import type { PaymentMethod } from "../api/types";
 
-const METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: "dinheiro", label: "Dinheiro" },
-  { value: "pix", label: "Pix" },
-  { value: "cartao", label: "Cartão" },
-  { value: "transferencia", label: "Transferência" },
-];
+const METHODS = Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[];
 
 export function PayTransactionForm({
   cashSessionId,
@@ -46,8 +42,8 @@ export function PayTransactionForm({
         <span className="label">Forma de pagamento</span>
         <select className="input" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
           {METHODS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
+            <option key={m} value={m}>
+              {PAYMENT_METHOD_LABELS[m]}
             </option>
           ))}
         </select>

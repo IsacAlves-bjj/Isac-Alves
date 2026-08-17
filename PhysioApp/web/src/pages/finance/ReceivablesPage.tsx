@@ -5,6 +5,7 @@ import { LoadState } from "../../components/LoadState";
 import { TransactionForm } from "../../components/TransactionForm";
 import type { TransactionFormValues } from "../../components/TransactionForm";
 import { PayTransactionForm } from "../../components/PayTransactionForm";
+import { ReceiptView } from "../../components/ReceiptView";
 import { Modal } from "../../components/Modal";
 import { TransactionStatusBadge } from "../../components/Badge";
 import { formatCurrency, formatDate } from "../../utils/format";
@@ -18,6 +19,7 @@ export function ReceivablesPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -96,6 +98,11 @@ export function ReceivablesPage() {
                         Marcar como pago
                       </button>
                     )}
+                    {t.status === "PAID" && (
+                      <button type="button" className="btn btn-secondary btn-small" onClick={() => setReceiptId(t.id)}>
+                        Emitir recibo
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -113,6 +120,12 @@ export function ReceivablesPage() {
       {payingId && (
         <Modal title="Registrar pagamento" onClose={() => setPayingId(null)}>
           <PayTransactionForm cashSessionId={cashSessionId} onSubmit={handlePay} />
+        </Modal>
+      )}
+
+      {receiptId && (
+        <Modal title="Recibo" onClose={() => setReceiptId(null)}>
+          <ReceiptView transactionId={receiptId} />
         </Modal>
       )}
     </div>

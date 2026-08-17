@@ -59,11 +59,27 @@ patientsRouter.get(
         clinicalRecords: { orderBy: { createdAt: "desc" } },
         treatmentPlans: { orderBy: { createdAt: "desc" } },
         transactions: { orderBy: { dueDate: "desc" } },
+        examRequests: { orderBy: { requestedAt: "desc" } },
+        feedbacks: { orderBy: { createdAt: "desc" } },
         lead: true,
       },
     });
     if (!patient) throw new AppError("Paciente não encontrado", 404);
-    res.json(patient);
+
+    // Número de sessões: previstas (do plano ativo) vs realizadas (contagem
+    // de evoluções registradas) — calculado aqui para não duplicar essa
+    // lógica em cada tela do painel.
+    const activePlan = patient.treatmentPlans.find((p) => p.active) ?? patient.treatmentPlans[0] ?? null;
+    const sessionsCompleted = patient.clinicalRecords.length;
+
+    res.json({
+      ...patient,
+      sessionsSummary: {
+        planned: activePlan?.sessionsPlanned ?? null,
+        completed: sessionsCompleted,
+        startDate: activePlan?.startDate ?? null,
+      },
+    });
   })
 );
 
@@ -76,5 +92,37 @@ patientsRouter.put(
       data: { ...data, birthDate: data.birthDate ? new Date(data.birthDate) : undefined },
     });
     res.json(patient);
+  })
+);
+
+const treatmentPlanSchema = z.object({
+  goal: z.string().min(1),
+  careLine: z.string().min(1),
+  startDate: z.string().datetime().optional(),
+  sessionsPlanned: z.number().int().positive().optional(),
+});
+
+// Cria um novo plano de tratamento ativo para o paciente, desativando o
+// anterior (se houver) — mantém o histórico em vez de sobrescrever.
+patientsRouter.post(
+  "/:id/treatment-plan",
+  asyncHandler(async (req, res) => {
+    const data = treatmentPlanSchema.parse(req.body);
+
+    await prisma.treatmentPlan.updateMany({
+      where: { patientId: req.params.id, active: true },
+      data: { active: false },
+    });
+
+    const plan = await prisma.treatmentPlan.create({
+      data: {
+        patientId: req.params.id,
+        goal: data.goal,
+        careLine: data.careLine,
+        sessionsPlanned: data.sessionsPlanned,
+        startDate: data.startDate ? new Date(data.startDate) : new Date(),
+      },
+    });
+    res.status(201).json(plan);
   })
 );

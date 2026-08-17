@@ -8,6 +8,7 @@ export interface StaffUser {
   name: string;
   email: string;
   role: StaffRole;
+  document?: string | null;
 }
 
 export type LeadStatus = "NOVO" | "EM_REVISAO" | "AGENDADO" | "DESCARTADO";
@@ -92,6 +93,7 @@ export interface Appointment {
   status: AppointmentStatus;
   location: string | null;
   notes: string | null;
+  confirmationSentAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -116,9 +118,38 @@ export interface TreatmentPlan {
   patientId: string;
   goal: string;
   careLine: string;
+  startDate: string | null;
   sessionsPlanned: number | null;
   active: boolean;
   createdAt: string;
+}
+
+export type ExamRequestStatus = "SOLICITADO" | "RECEBIDO";
+
+export interface ExamRequest {
+  id: string;
+  patientId: string;
+  appointmentId: string | null;
+  description: string;
+  status: ExamRequestStatus;
+  requestedAt: string;
+  resultNotes: string | null;
+  resultReceivedAt: string | null;
+}
+
+export interface PatientFeedback {
+  id: string;
+  patientId: string;
+  appointmentId: string | null;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+export interface SessionsSummary {
+  planned: number | null;
+  completed: number;
+  startDate: string | null;
 }
 
 export interface Patient {
@@ -136,13 +167,29 @@ export interface Patient {
   clinicalRecords?: ClinicalRecord[];
   treatmentPlans?: TreatmentPlan[];
   transactions?: Transaction[];
+  examRequests?: ExamRequest[];
+  feedbacks?: PatientFeedback[];
+  sessionsSummary?: SessionsSummary;
   createdAt: string;
   updatedAt: string;
 }
 
 export type TransactionType = "RECEIVABLE" | "PAYABLE";
 export type TransactionStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
-export type PaymentMethod = "dinheiro" | "pix" | "cartao" | "transferencia";
+export type PaymentMethod =
+  | "dinheiro"
+  | "pix"
+  | "cartao_credito"
+  | "cartao_debito"
+  | "transferencia";
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  dinheiro: "Dinheiro",
+  pix: "Pix",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+  transferencia: "Transferência",
+};
 
 export interface Supplier {
   id: string;
@@ -171,6 +218,13 @@ export interface Transaction {
   cashSessionId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Receipt {
+  id: string;
+  number: string;
+  issuedAt: string;
+  transaction: Transaction;
 }
 
 export interface CashSession {

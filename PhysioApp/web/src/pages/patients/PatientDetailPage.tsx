@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiError } from "../../api/client";
-import type { Appointment, ClinicalRecord, Patient } from "../../api/types";
+import type {
+  Appointment,
+  ClinicalRecord,
+  ExamRequest,
+  Patient,
+  PatientFeedback,
+  TreatmentPlan,
+} from "../../api/types";
 import { LoadState } from "../../components/LoadState";
 import { PatientForm } from "../../components/PatientForm";
 import type { PatientFormValues } from "../../components/PatientForm";
@@ -9,11 +17,17 @@ import { AppointmentForm } from "../../components/AppointmentForm";
 import type { AppointmentFormValues } from "../../components/AppointmentForm";
 import { ClinicalRecordForm } from "../../components/ClinicalRecordForm";
 import type { ClinicalRecordFormValues } from "../../components/ClinicalRecordForm";
-import { AppointmentStatusBadge } from "../../components/Badge";
+import { TreatmentPlanForm } from "../../components/TreatmentPlanForm";
+import type { TreatmentPlanFormValues } from "../../components/TreatmentPlanForm";
+import { ExamRequestForm } from "../../components/ExamRequestForm";
+import type { ExamRequestFormValues } from "../../components/ExamRequestForm";
+import { FeedbackForm } from "../../components/FeedbackForm";
+import type { FeedbackFormValues } from "../../components/FeedbackForm";
+import { AppointmentStatusBadge, Badge } from "../../components/Badge";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/format";
 import { Modal } from "../../components/Modal";
 
-type TabKey = "visao-geral" | "agendamentos" | "prontuario";
+type TabKey = "visao-geral" | "agendamentos" | "prontuario" | "exames" | "feedback";
 
 export function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +37,10 @@ export function PatientDetailPage() {
   const [tab, setTab] = useState<TabKey>("visao-geral");
   const [showEdit, setShowEdit] = useState(false);
   const [showNewAppointment, setShowNewAppointment] = useState(false);
+  const [showTreatmentPlan, setShowTreatmentPlan] = useState(false);
+  const [receivingExamId, setReceivingExamId] = useState<string | null>(null);
+  const [resultNotes, setResultNotes] = useState("");
+  const [sendingConfirmationId, setSendingConfirmationId] = useState<string | null>(null);
 
   async function load() {
     if (!id) return;
@@ -62,8 +80,48 @@ export function PatientDetailPage() {
     await load();
   }
 
+  async function handleCreateTreatmentPlan(values: TreatmentPlanFormValues) {
+    if (!id) return;
+    await api.post<TreatmentPlan>(`/patients/${id}/treatment-plan`, values);
+    setShowTreatmentPlan(false);
+    await load();
+  }
+
+  async function handleCreateExamRequest(values: ExamRequestFormValues) {
+    if (!id) return;
+    await api.post<ExamRequest>("/exam-requests", { patientId: id, ...values });
+    await load();
+  }
+
+  async function handleReceiveExam(examId: string, event: FormEvent) {
+    event.preventDefault();
+    await api.patch<ExamRequest>(`/exam-requests/${examId}/receive`, { resultNotes: resultNotes || undefined });
+    setReceivingExamId(null);
+    setResultNotes("");
+    await load();
+  }
+
+  async function handleCreateFeedback(values: FeedbackFormValues) {
+    if (!id) return;
+    await api.post<PatientFeedback>("/feedback", { patientId: id, ...values });
+    await load();
+  }
+
+  async function handleSendConfirmation(appointmentId: string) {
+    setSendingConfirmationId(appointmentId);
+    try {
+      await api.post<Appointment>(`/appointments/${appointmentId}/send-confirmation`);
+      await load();
+    } finally {
+      setSendingConfirmationId(null);
+    }
+  }
+
   const appointments = patient?.appointments ?? [];
   const clinicalRecords = patient?.clinicalRecords ?? [];
+  const examRequests = patient?.examRequests ?? [];
+  const feedbacks = patient?.feedbacks ?? [];
+  const activePlan = patient?.treatmentPlans?.find((p) => p.active) ?? patient?.treatmentPlans?.[0];
   const recordedAppointmentIds = new Set(clinicalRecords.map((r) => r.appointmentId));
   const availableAppointments = appointments.filter((a) => !recordedAppointmentIds.has(a.id));
 
@@ -88,6 +146,12 @@ export function PatientDetailPage() {
               </button>
               <button type="button" className={tab === "prontuario" ? "tab tab-active" : "tab"} onClick={() => setTab("prontuario")}>
                 Prontuário ({clinicalRecords.length})
+              </button>
+              <button type="button" className={tab === "exames" ? "tab tab-active" : "tab"} onClick={() => setTab("exames")}>
+                Exames ({examRequests.length})
+              </button>
+              <button type="button" className={tab === "feedback" ? "tab tab-active" : "tab"} onClick={() => setTab("feedback")}>
+                Feedback ({feedbacks.length})
               </button>
             </div>
 
@@ -160,17 +224,34 @@ export function PatientDetailPage() {
 
                 <div className="detail-side">
                   <section className="card">
-                    <h2>Plano de tratamento</h2>
-                    {(!patient.treatmentPlans || patient.treatmentPlans.length === 0) ? (
+                    <div className="card-title-row">
+                      <h2>Tratamento</h2>
+                      <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowTreatmentPlan(true)}>
+                        {activePlan ? "Atualizar" : "Iniciar"}
+                      </button>
+                    </div>
+                    {!activePlan ? (
                       <p className="muted">Nenhum plano de tratamento registrado.</p>
                     ) : (
-                      patient.treatmentPlans.map((plan) => (
-                        <div key={plan.id} className="plan-item">
-                          <strong>{plan.goal}</strong>
-                          <p>{plan.careLine}</p>
-                          {plan.sessionsPlanned && <span className="muted small">{plan.sessionsPlanned} sessões previstas</span>}
+                      <>
+                        <dl className="info-list" style={{ marginBottom: 12 }}>
+                          <div>
+                            <dt>Início do tratamento</dt>
+                            <dd>{patient.sessionsSummary?.startDate ? formatDate(patient.sessionsSummary.startDate) : "—"}</dd>
+                          </div>
+                          <div>
+                            <dt>Sessões</dt>
+                            <dd>
+                              {patient.sessionsSummary?.completed ?? 0}
+                              {patient.sessionsSummary?.planned ? ` de ${patient.sessionsSummary.planned}` : ""} realizadas
+                            </dd>
+                          </div>
+                        </dl>
+                        <div className="plan-item">
+                          <strong>{activePlan.goal}</strong>
+                          <p>{activePlan.careLine}</p>
                         </div>
-                      ))
+                      </>
                     )}
                   </section>
 
@@ -202,8 +283,27 @@ export function PatientDetailPage() {
                     {appointments.map((appt) => (
                       <li key={appt.id}>
                         <span className="simple-list-time">{formatDateTime(appt.startsAt)}</span>
-                        <span className="simple-list-main">{appt.location ?? "Consultório"}</span>
+                        <span className="simple-list-main">
+                          {appt.location ?? "Consultório"}
+                          {appt.confirmationSentAt && (
+                            <span className="muted small"> · confirmação enviada em {formatDateTime(appt.confirmationSentAt)}</span>
+                          )}
+                        </span>
                         <AppointmentStatusBadge status={appt.status} />
+                        {appt.status === "AGENDADO" && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-small"
+                            disabled={sendingConfirmationId === appt.id}
+                            onClick={() => handleSendConfirmation(appt.id)}
+                          >
+                            {sendingConfirmationId === appt.id
+                              ? "Enviando..."
+                              : appt.confirmationSentAt
+                                ? "Reenviar confirmação"
+                                : "Enviar confirmação"}
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -257,6 +357,100 @@ export function PatientDetailPage() {
                 </div>
               </div>
             )}
+
+            {tab === "exames" && (
+              <div className="detail-grid">
+                <div className="detail-main">
+                  <section className="card">
+                    <h2>Exames solicitados</h2>
+                    {examRequests.length === 0 ? (
+                      <p className="muted">Nenhum exame solicitado ainda.</p>
+                    ) : (
+                      examRequests.map((exam) => (
+                        <article key={exam.id} className="record-item">
+                          <header>
+                            <strong>{exam.description}</strong>
+                            <Badge tone={exam.status === "RECEBIDO" ? "success" : "warning"}>
+                              {exam.status === "RECEBIDO" ? "Recebido" : "Solicitado"}
+                            </Badge>
+                          </header>
+                          <p className="muted small">Solicitado em {formatDateTime(exam.requestedAt)}</p>
+                          {exam.resultNotes && <p>{exam.resultNotes}</p>}
+                          {exam.status === "SOLICITADO" && receivingExamId !== exam.id && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-small"
+                              onClick={() => {
+                                setReceivingExamId(exam.id);
+                                setResultNotes("");
+                              }}
+                            >
+                              Marcar como recebido
+                            </button>
+                          )}
+                          {receivingExamId === exam.id && (
+                            <form className="form" onSubmit={(e) => handleReceiveExam(exam.id, e)} style={{ marginTop: 8 }}>
+                              <label className="field">
+                                <span className="label">Resumo do resultado (opcional)</span>
+                                <textarea
+                                  className="input"
+                                  rows={2}
+                                  value={resultNotes}
+                                  onChange={(e) => setResultNotes(e.target.value)}
+                                />
+                              </label>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button type="submit" className="btn btn-primary btn-small">
+                                  Confirmar recebimento
+                                </button>
+                                <button type="button" className="btn btn-secondary btn-small" onClick={() => setReceivingExamId(null)}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </article>
+                      ))
+                    )}
+                  </section>
+                </div>
+                <div className="detail-side">
+                  <section className="card">
+                    <h2>Solicitar exame</h2>
+                    <ExamRequestForm onSubmit={handleCreateExamRequest} />
+                  </section>
+                </div>
+              </div>
+            )}
+
+            {tab === "feedback" && (
+              <div className="detail-grid">
+                <div className="detail-main">
+                  <section className="card">
+                    <h2>Feedback do paciente</h2>
+                    {feedbacks.length === 0 ? (
+                      <p className="muted">Nenhum feedback registrado ainda.</p>
+                    ) : (
+                      feedbacks.map((f) => (
+                        <article key={f.id} className="record-item">
+                          <header>
+                            <strong>{"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}</strong>
+                            <span className="muted small">{formatDateTime(f.createdAt)}</span>
+                          </header>
+                          {f.comment && <p>{f.comment}</p>}
+                        </article>
+                      ))
+                    )}
+                  </section>
+                </div>
+                <div className="detail-side">
+                  <section className="card">
+                    <h2>Registrar feedback</h2>
+                    <FeedbackForm onSubmit={handleCreateFeedback} />
+                  </section>
+                </div>
+              </div>
+            )}
           </>
         )}
       </LoadState>
@@ -270,6 +464,12 @@ export function PatientDetailPage() {
       {showNewAppointment && patient && (
         <Modal title="Novo agendamento" onClose={() => setShowNewAppointment(false)}>
           <AppointmentForm fixedPatient={patient} onSubmit={handleCreateAppointment} />
+        </Modal>
+      )}
+
+      {showTreatmentPlan && patient && (
+        <Modal title={activePlan ? "Atualizar plano de tratamento" : "Iniciar plano de tratamento"} onClose={() => setShowTreatmentPlan(false)}>
+          <TreatmentPlanForm initial={activePlan} onSubmit={handleCreateTreatmentPlan} />
         </Modal>
       )}
     </div>

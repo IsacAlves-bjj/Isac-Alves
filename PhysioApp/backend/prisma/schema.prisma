@@ -26,6 +26,7 @@ model User {
   email        String   @unique
   passwordHash String
   role         String   @default("FISIOTERAPEUTA") // "ADMIN" | "FISIOTERAPEUTA"
+  document     String? // CPF/CNPJ do profissional, usado como emitente nos recibos
   createdAt    DateTime @default(now())
 
   clinicalRecords ClinicalRecord[]
@@ -129,6 +130,8 @@ model Patient {
   clinicalRecords ClinicalRecord[]
   treatmentPlans  TreatmentPlan[]
   transactions    Transaction[]
+  examRequests    ExamRequest[]
+  feedbacks       PatientFeedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -140,9 +143,43 @@ model TreatmentPlan {
   patient      Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   goal         String
   careLine     String // linha de cuidado (texto livre, iniciada pela sugestão automática)
+  startDate    DateTime? // início do tratamento (pode ser anterior ao cadastro no sistema)
   sessionsPlanned Int?
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// Exames solicitados ao paciente
+// ---------------------------------------------------------------------
+
+// status: "SOLICITADO" | "RECEBIDO"
+model ExamRequest {
+  id              String    @id @default(cuid())
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId   String?
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
+  description     String // ex.: "Ressonância de joelho direito"
+  status          String    @default("SOLICITADO")
+  requestedAt     DateTime  @default(now())
+  resultNotes     String? // resumo do resultado, preenchido quando o paciente traz o exame
+  resultReceivedAt DateTime?
+}
+
+// ---------------------------------------------------------------------
+// Feedback do paciente (satisfação, não é dado clínico)
+// ---------------------------------------------------------------------
+
+model PatientFeedback {
+  id            String   @id @default(cuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  rating        Int // 1 a 5
+  comment       String?
+  createdAt     DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------
@@ -159,9 +196,12 @@ model Appointment {
   status    String   @default("AGENDADO")
   location  String? // "Consultório" | "Domiciliar" | "Teleconsulta"
   notes     String?
+  confirmationSentAt DateTime? // último disparo de confirmação enviado ao paciente
 
   clinicalRecord ClinicalRecord?
   transaction    Transaction?
+  examRequests   ExamRequest[]
+  feedbacks      PatientFeedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -227,7 +267,7 @@ model Transaction {
   amount      Float
   dueDate     DateTime
   paidAt      DateTime?
-  paymentMethod String? // "dinheiro", "pix", "cartao", "transferencia"
+  paymentMethod String? // "dinheiro" | "pix" | "cartao_credito" | "cartao_debito" | "transferencia"
 
   patientId String?
   patient   Patient? @relation(fields: [patientId], references: [id])
@@ -241,6 +281,17 @@ model Transaction {
   cashSessionId String?
   cashSession   CashSession? @relation(fields: [cashSessionId], references: [id])
 
+  receipt   Receipt?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Recibo de uma conta a receber já paga. Emitido uma única vez por
+// transação (reemitir devolve o mesmo recibo, não cria um novo número).
+model Receipt {
+  id            String      @id @default(cuid())
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  issuedAt      DateTime    @default(now())
 }

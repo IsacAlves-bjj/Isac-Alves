@@ -82,3 +82,28 @@ appointmentsRouter.patch(
     res.json(appointment);
   })
 );
+
+// Dispara a confirmação do agendamento para o paciente. Hoje registra
+// apenas o horário do envio (confirmationSentAt) e loga no console —
+// TODO(integração futura): disparo real por SMS/WhatsApp, como o OTP
+// em auth.routes.ts.
+appointmentsRouter.post(
+  "/:id/send-confirmation",
+  asyncHandler(async (req, res) => {
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: req.params.id },
+      include: { patient: true },
+    });
+    if (!appointment) throw new AppError("Agendamento não encontrado", 404);
+
+    console.log(
+      `[Confirmação] Enviando para ${appointment.patient.name} (${appointment.patient.phone}) — sessão em ${appointment.startsAt.toISOString()}`
+    );
+
+    const updated = await prisma.appointment.update({
+      where: { id: req.params.id },
+      data: { confirmationSentAt: new Date() },
+    });
+    res.json(updated);
+  })
+);
