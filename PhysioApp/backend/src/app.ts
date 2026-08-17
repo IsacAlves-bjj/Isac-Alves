@@ -15,8 +15,17 @@ import { referralsRouter } from "./routes/referrals.routes";
 
 export const app = express();
 
-app.use(cors());
-app.use(express.json());
+// CORS_ORIGIN aceita uma lista separada por vírgula (painel web + app do
+// paciente, quando publicados em domínios diferentes). Sem a variável,
+// libera qualquer origem — conveniente em desenvolvimento/teste, mas deve
+// ser restrito antes de ir ao ar com pacientes reais.
+const corsOrigin = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim());
+app.use(cors({ origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true }));
+
+// Limite alto o bastante para as fotos/documentos em data URL (avatar até
+// ~2MB, tabela de preços até ~6MB — ver auth.routes.ts) — o default do
+// express (100kb) rejeitaria esses uploads com 413.
+app.use(express.json({ limit: "10mb" }));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

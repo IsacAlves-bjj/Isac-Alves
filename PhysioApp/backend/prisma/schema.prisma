@@ -6,10 +6,11 @@ generator client {
 }
 
 datasource db {
-  // SQLite em dev por simplicidade de setup. Em produção, trocar para
-  // provider = "postgresql" e apontar DATABASE_URL para o Postgres real —
-  // o restante do schema não muda.
-  provider = "sqlite"
+  // Postgres em dev e produção — mesma engine nas duas pontas para não
+  // divergir em comportamento (ex.: precisão de Float, locking). Local:
+  // instância Postgres na máquina de dev. Produção: Postgres gerenciado
+  // (Railway), indicado via DATABASE_URL.
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

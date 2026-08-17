@@ -29,7 +29,7 @@ sem nenhuma dependência entre os dois.
                              ▼
                     ┌──────────────────┐
                     │  PostgreSQL        │
-                    │  (SQLite em dev)   │
+                    │  (dev e produção)  │
                     └──────────────────┘
 ```
 
@@ -148,9 +148,17 @@ duplicar a lógica de desativar o plano anterior.
 
 ## 5. Stack e decisões técnicas
 
-- **Backend**: Node.js + TypeScript + Express + Prisma. SQLite em
-  desenvolvimento (zero setup), PostgreSQL em produção — o schema Prisma é
-  o mesmo, só troca o `provider`/`DATABASE_URL`.
+- **Backend**: Node.js + TypeScript + Express + Prisma. PostgreSQL em dev
+  e produção (mesma engine nas duas pontas, ver `docs/DEPLOY.md`) — dev
+  local aponta para uma instância Postgres na própria máquina, produção
+  para o Postgres gerenciado do provedor de hospedagem.
+- **Deploy**: Railway (backend + painel web + Postgres gerenciado) — ver
+  `docs/DEPLOY.md` para o passo a passo completo, incluindo por que não
+  Vercel/Netlify (restrição de uso comercial no plano gratuito) e o plano
+  de custo.
+- **PWA**: o painel web é instalável (manifest + service worker mínimo em
+  `web/public/`) — funciona como app no celular (ícone, tela cheia) sem
+  precisar de loja de aplicativos.
 - **Auth**: JWT stateless. Painel usa login e-mail/senha (bcrypt). App do
   paciente usa fluxo simplificado telefone + código de verificação (mock
   em dev — hook pronto para SMS real depois).
