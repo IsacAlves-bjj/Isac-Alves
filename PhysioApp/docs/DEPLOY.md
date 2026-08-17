@@ -5,6 +5,43 @@ computador" para um link de verdade, acessível de qualquer lugar —
 etapa necessária tanto para a Dra. Gabrielly usar o painel no celular
 quanto para o link de captação de leads (bio do Instagram) funcionar.
 
+## 0. Cola rápida (valores prontos pra copiar)
+
+Tudo testado localmente simulando exatamente o que o Railway vai rodar
+(build limpo, `npm install` do zero, banco vazio) — nenhuma surpresa
+esperada. Esses são os únicos valores que você vai precisar colar
+durante a configuração (passo 3):
+
+**Variáveis do serviço backend:**
+```
+JWT_SECRET=<gere um valor único — nunca reaproveite um que já apareceu em chat/commit>
+PATIENT_OTP_DEV=123456
+```
+Para gerar o `JWT_SECRET`, rode isso no seu terminal (ou peça pro
+Railway sugerir um valor aleatório na hora de criar a variável):
+```
+openssl rand -hex 32
+```
+**Nunca coloque o `JWT_SECRET` real em um arquivo commitado no git** —
+é o segredo que assina o login de todo mundo; se vazar, qualquer um
+pode forjar acesso ao sistema. Cole só direto na tela de Variables do
+Railway.
+
+(`DATABASE_URL` e `CORS_ORIGIN` não são texto pra copiar — são referências
+a outros serviços, geradas clicando na interface do Railway, ver 3.3 e 3.5.)
+
+**Variável do serviço web:**
+```
+VITE_API_URL=<url pública do backend, gerada no passo 3.3.4>
+```
+
+Checklist de contas/decisões que só você consegue tomar:
+- [ ] Criar conta no Railway (github.com login funciona)
+- [ ] Adicionar um cartão/forma de pagamento (plano Hobby, $5/mês)
+- [ ] Seguir os passos 3.1 a 3.6 abaixo
+- [ ] Me avisar quando tiver as duas URLs geradas (backend e web) — eu
+      confirmo se está tudo certo e ajudo a resolver qualquer erro
+
 ## 1. Visão geral
 
 Três peças, hospedadas juntas no [Railway](https://railway.com):
@@ -64,9 +101,8 @@ comercial de fato), o projeto precisa subir para o plano Pro
    - `DATABASE_URL` → clique em "Add Reference" e aponte para o
      Postgres criado no passo 3.2 (o Railway resolve isso sozinho, sem
      copiar/colar string de conexão).
-   - `JWT_SECRET` → uma string aleatória longa (ex.: gere uma em
-     [1password.com/password-generator](https://1password.com/password-generator)
-     ou peça pro Railway mesmo sugerir um valor aleatório).
+   - `JWT_SECRET` → gere com `openssl rand -hex 32` (ver seção "0. Cola
+     rápida") e cole só aqui, nunca em um arquivo do repositório.
    - `PATIENT_OTP_DEV` → `123456` (por enquanto — trocar quando o SMS
      real de verificação do paciente for integrado).
    - `PORT` → não precisa definir, o Railway injeta automaticamente.
