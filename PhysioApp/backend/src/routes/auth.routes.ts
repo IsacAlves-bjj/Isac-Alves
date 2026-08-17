@@ -1,12 +1,29 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import type { User } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../middleware/errorHandler";
 import { AppError } from "../utils/AppError";
 import { requireAuth, signPatientToken, signStaffToken } from "../middleware/auth";
 
 export const authRouter = Router();
+
+// Projeção pública do usuário da equipe — nunca inclui passwordHash.
+// Centralizado aqui porque login, GET /me e PATCH /me retornam o mesmo formato.
+function serializeStaffUser(user: User) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    document: user.document,
+    avatarUrl: user.avatarUrl,
+    priceTableUrl: user.priceTableUrl,
+    priceTableName: user.priceTableName,
+    priceTableUpdatedAt: user.priceTableUpdatedAt,
+  };
+}
 
 // --- Login da fisioterapeuta/equipe (painel web) --------------------
 
@@ -27,17 +44,7 @@ authRouter.post(
     if (!ok) throw new AppError("Credenciais inválidas", 401);
 
     const token = signStaffToken(user.id, user.role as "ADMIN" | "FISIOTERAPEUTA");
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        document: user.document,
-        avatarUrl: user.avatarUrl,
-      },
-    });
+    res.json({ token, user: serializeStaffUser(user) });
   })
 );
 
@@ -66,24 +73,20 @@ authRouter.get(
   asyncHandler(async (req, res) => {
     if (req.auth?.kind !== "staff") throw new AppError("Acesso restrito à equipe", 403);
     const user = await prisma.user.findUniqueOrThrow({ where: { id: req.auth.sub } });
-    res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      document: user.document,
-      avatarUrl: user.avatarUrl,
-    });
+    res.json(serializeStaffUser(user));
   })
 );
 
 const updateMeSchema = z.object({
   name: z.string().min(1).optional(),
   document: z.string().optional(),
-  // Data URL (base64) de uma foto pequena — sem serviço de storage próprio
-  // ainda, a imagem fica guardada direto no banco. Limite generoso o
-  // bastante para uma foto de perfil comprimida no navegador antes do envio.
+  // Data URL (base64) — sem serviço de storage próprio ainda, o arquivo
+  // fica guardado direto no banco. Limites generosos o bastante para uma
+  // foto de perfil comprimida no navegador, ou um PDF/imagem de tabela de
+  // preços de poucas páginas.
   avatarUrl: z.string().max(2_000_000).optional(),
+  priceTableUrl: z.string().max(6_000_000).optional(),
+  priceTableName: z.string().max(200).optional(),
 });
 
 authRouter.patch(
@@ -92,15 +95,14 @@ authRouter.patch(
   asyncHandler(async (req, res) => {
     if (req.auth?.kind !== "staff") throw new AppError("Acesso restrito à equipe", 403);
     const data = updateMeSchema.parse(req.body);
-    const user = await prisma.user.update({ where: { id: req.auth.sub }, data });
-    res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      document: user.document,
-      avatarUrl: user.avatarUrl,
+    const user = await prisma.user.update({
+      where: { id: req.auth.sub },
+      data: {
+        ...data,
+        priceTableUpdatedAt: data.priceTableUrl ? new Date() : undefined,
+      },
     });
+    res.json(serializeStaffUser(user));
   })
 );
 

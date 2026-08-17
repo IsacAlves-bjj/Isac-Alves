@@ -28,6 +28,9 @@ model User {
   role         String   @default("FISIOTERAPEUTA") // "ADMIN" | "FISIOTERAPEUTA"
   document     String? // CPF/CNPJ do profissional, usado como emitente nos recibos
   avatarUrl    String? // foto de perfil (data URL ou link), exibida no painel
+  priceTableUrl  String? // tabela de preços (data URL), documento de referência da fisioterapeuta
+  priceTableName String? // nome original do arquivo enviado, para exibir no painel
+  priceTableUpdatedAt DateTime?
   createdAt    DateTime @default(now())
 
   clinicalRecords ClinicalRecord[]
@@ -129,6 +132,8 @@ model Patient {
   height    Float? // cm
   comorbidities String? // texto livre: "Diabetes, hipertensão..."
   preferredLocation String?
+  billingType   String  @default("PARTICULAR") // "PARTICULAR" | "CONVENIO"
+  insuranceName String? // nome do convênio, preenchido quando billingType = "CONVENIO"
 
   leadId String? @unique
   lead   Lead?   @relation(fields: [leadId], references: [id])
@@ -292,6 +297,9 @@ model Transaction {
   dueDate     DateTime
   paidAt      DateTime?
   paymentMethod String? // "dinheiro" | "pix" | "cartao_credito" | "cartao_debito" | "transferencia"
+  billingType   String? // "PARTICULAR" | "CONVENIO" — só se aplica a RECEIVABLE; registrado no
+                        // lançamento (não só no paciente) para o histórico não mudar se o
+                        // paciente trocar de convênio depois.
 
   patientId String?
   patient   Patient? @relation(fields: [patientId], references: [id])

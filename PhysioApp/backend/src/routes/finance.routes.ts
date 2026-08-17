@@ -114,6 +114,7 @@ const transactionSchema = z.object({
   patientId: z.string().optional(),
   appointmentId: z.string().optional(),
   supplierId: z.string().optional(),
+  billingType: z.enum(["PARTICULAR", "CONVENIO"]).optional(), // só RECEIVABLE
 });
 
 financeRouter.get(
@@ -143,8 +144,17 @@ financeRouter.post(
       throw new AppError("Conta a pagar precisa de um fornecedor vinculado", 400);
     }
 
+    // Se não vier explícito, herda o tipo de cobrança padrão do paciente —
+    // mas fica registrado no lançamento, não recalculado depois, para o
+    // histórico não mudar se o paciente trocar de convênio.
+    let billingType = data.billingType;
+    if (data.type === "RECEIVABLE" && !billingType && data.patientId) {
+      const patient = await prisma.patient.findUnique({ where: { id: data.patientId } });
+      billingType = (patient?.billingType as "PARTICULAR" | "CONVENIO" | undefined) ?? "PARTICULAR";
+    }
+
     const transaction = await prisma.transaction.create({
-      data: { ...data, dueDate: new Date(data.dueDate) },
+      data: { ...data, billingType, dueDate: new Date(data.dueDate) },
     });
     res.status(201).json(transaction);
   })
@@ -248,6 +258,12 @@ financeRouter.get(
 
     const revenue = receivablesPaid.reduce((sum, t) => sum + t.amount, 0);
     const expenses = payablesPaid.reduce((sum, t) => sum + t.amount, 0);
+    const revenueParticular = receivablesPaid
+      .filter((t) => t.billingType !== "CONVENIO")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const revenueConvenio = receivablesPaid
+      .filter((t) => t.billingType === "CONVENIO")
+      .reduce((sum, t) => sum + t.amount, 0);
 
     res.json({
       month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
@@ -256,6 +272,8 @@ financeRouter.get(
       net: revenue - expenses,
       receivablesCount: receivablesPaid.length,
       payablesCount: payablesPaid.length,
+      revenueParticular,
+      revenueConvenio,
     });
   })
 );

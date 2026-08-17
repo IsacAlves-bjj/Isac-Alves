@@ -7,8 +7,9 @@ import type { TransactionFormValues } from "../../components/TransactionForm";
 import { PayTransactionForm } from "../../components/PayTransactionForm";
 import { ReceiptView } from "../../components/ReceiptView";
 import { Modal } from "../../components/Modal";
-import { TransactionStatusBadge } from "../../components/Badge";
+import { Badge, TransactionStatusBadge } from "../../components/Badge";
 import { formatCurrency, formatDate } from "../../utils/format";
+import { BILLING_TYPE_LABELS } from "../../api/types";
 import type { PaymentMethod } from "../../api/types";
 
 export function ReceivablesPage() {
@@ -76,6 +77,7 @@ export function ReceivablesPage() {
               <tr>
                 <th>Paciente</th>
                 <th>Descrição</th>
+                <th>Cobrança</th>
                 <th>Vencimento</th>
                 <th>Valor</th>
                 <th>Status</th>
@@ -87,6 +89,13 @@ export function ReceivablesPage() {
                 <tr key={t.id}>
                   <td>{t.patient?.name ?? "—"}</td>
                   <td>{t.description}</td>
+                  <td>
+                    {t.billingType && (
+                      <Badge tone={t.billingType === "CONVENIO" ? "info" : "neutral"}>
+                        {BILLING_TYPE_LABELS[t.billingType]}
+                      </Badge>
+                    )}
+                  </td>
                   <td>{formatDate(t.dueDate)}</td>
                   <td>{formatCurrency(t.amount)}</td>
                   <td>

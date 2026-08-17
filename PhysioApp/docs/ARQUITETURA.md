@@ -55,12 +55,18 @@ autenticado como fisioterapeuta/admin.
 Ver `backend/prisma/schema.prisma` para a fonte de verdade. Resumo das
 entidades principais:
 
-- **User** — fisioterapeuta/equipe do painel (login, role).
+- **User** — fisioterapeuta/equipe do painel (login, role). Guarda também
+  `priceTableUrl`/`priceTableName`/`priceTableUpdatedAt` — tabela de preços
+  (PDF ou imagem) enviada em Configurações, mesmo padrão de data URL do
+  `avatarUrl`.
 - **Patient** — cadastro definitivo, com link opcional para o `Lead` que o
   originou. Além dos dados de contato, guarda peso/altura, comorbidades
   (texto livre) e local de atendimento preferido (`Consultório`/
   `Domiciliar`/`Teleconsulta` — só uma sugestão de preenchimento ao criar
   agendamento, cada sessão pode ter local diferente do preferido).
+  `billingType` (`PARTICULAR`/`CONVENIO`, com `insuranceName` quando
+  convênio) é o padrão de cobrança do paciente — controle da
+  fisioterapeuta, não afeta o fluxo de triagem/agendamento do paciente.
 - **TriageCategory** / **TriageQuestion** — catálogo configurável das
   "caixinhas" e perguntas (gerais + por categoria), conforme `TRIAGEM.md`.
 - **Lead** — pré-triagem enviada pelo app: identificação, categoria,
@@ -91,7 +97,12 @@ entidades principais:
   (`receivable`/`payable`), status (`pending/paid/overdue/cancelled`),
   forma de pagamento (`dinheiro/pix/cartao_credito/cartao_debito/transferencia`),
   vinculado opcionalmente a `Patient` (recebível) ou `Supplier` (pagável)
-  e a `CashSession` quando baixado em caixa.
+  e a `CashSession` quando baixado em caixa. Recebíveis também guardam
+  `billingType` (`PARTICULAR`/`CONVENIO`) — herdado do paciente no
+  lançamento se não vier explícito, mas fixado na transação para o
+  histórico não mudar se o paciente trocar de convênio depois. O resumo
+  mensal (`GET /finance/summary/month`) soma `revenueParticular` e
+  `revenueConvenio` separadamente, além do faturamento total.
 - **Receipt** — recibo de uma `Transaction` recebível já paga. Emitido
   uma única vez por transação — reemitir retorna o mesmo recibo em vez de
   gerar um novo número, usando `User.document` (CPF/CNPJ cadastrado em

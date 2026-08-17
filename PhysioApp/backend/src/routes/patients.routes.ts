@@ -21,6 +21,8 @@ const patientSchema = z.object({
   height: z.number().positive().optional(),
   comorbidities: z.string().optional(),
   preferredLocation: z.enum(["Consultório", "Domiciliar", "Teleconsulta"]).optional(),
+  billingType: z.enum(["PARTICULAR", "CONVENIO"]).optional(),
+  insuranceName: z.string().optional(),
 });
 
 patientsRouter.get(

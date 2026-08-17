@@ -10,7 +10,12 @@ export interface StaffUser {
   role: StaffRole;
   document?: string | null;
   avatarUrl?: string | null;
+  priceTableUrl?: string | null;
+  priceTableName?: string | null;
+  priceTableUpdatedAt?: string | null;
 }
+
+export type BillingType = "PARTICULAR" | "CONVENIO";
 
 export type LeadStatus = "NOVO" | "EM_REVISAO" | "AGENDADO" | "DESCARTADO";
 export type LeadPriority = "NORMAL" | "ATENCAO_CLINICA" | "REVISAO_MANUAL";
@@ -180,6 +185,8 @@ export interface Patient {
   height: number | null;
   comorbidities: string | null;
   preferredLocation: PatientLocation | null;
+  billingType: BillingType;
+  insuranceName: string | null;
   leadId: string | null;
   lead?: Lead | null;
   appointments?: Appointment[];
@@ -211,6 +218,11 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   transferencia: "Transferência",
 };
 
+export const BILLING_TYPE_LABELS: Record<BillingType, string> = {
+  PARTICULAR: "Particular",
+  CONVENIO: "Convênio",
+};
+
 export interface Supplier {
   id: string;
   name: string;
@@ -229,6 +241,7 @@ export interface Transaction {
   dueDate: string;
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
+  billingType: BillingType | null;
   patientId: string | null;
   patient?: Patient | null;
   appointmentId: string | null;
@@ -266,6 +279,8 @@ export interface MonthlyFinanceSummary {
   net: number;
   receivablesCount: number;
   payablesCount: number;
+  revenueParticular: number;
+  revenueConvenio: number;
 }
 
 export interface DashboardSummary {

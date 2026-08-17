@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError } from "../api/client";
-import type { Patient, Supplier, TransactionType } from "../api/types";
+import { BILLING_TYPE_LABELS } from "../api/types";
+import type { BillingType, Patient, Supplier, TransactionType } from "../api/types";
 import { localDateTimeToISO } from "../utils/format";
 
 export interface TransactionFormValues {
@@ -11,7 +12,10 @@ export interface TransactionFormValues {
   dueDate: string;
   patientId?: string;
   supplierId?: string;
+  billingType?: BillingType;
 }
+
+const BILLING_TYPES = Object.keys(BILLING_TYPE_LABELS) as BillingType[];
 
 // Conta a receber exige paciente; conta a pagar exige fornecedor (regra do
 // backend em finance.routes.ts) — o formulário só mostra o seletor relevante.
@@ -31,8 +35,18 @@ export function TransactionForm({
   const [dueDate, setDueDate] = useState("");
   const [patientId, setPatientId] = useState("");
   const [supplierId, setSupplierId] = useState("");
+  const [billingType, setBillingType] = useState<BillingType>("PARTICULAR");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Ao escolher o paciente, sugere o tipo de cobrança cadastrado nele —
+  // a fisioterapeuta ainda pode trocar antes de lançar (ex.: consulta
+  // avulsa particular de um paciente que normalmente usa convênio).
+  function handlePatientChange(id: string) {
+    setPatientId(id);
+    const patient = patients?.find((p) => p.id === id);
+    if (patient) setBillingType(patient.billingType);
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -54,12 +68,14 @@ export function TransactionForm({
         dueDate: localDateTimeToISO(dueDate),
         patientId: type === "RECEIVABLE" ? patientId : undefined,
         supplierId: type === "PAYABLE" ? supplierId : undefined,
+        billingType: type === "RECEIVABLE" ? billingType : undefined,
       });
       setDescription("");
       setAmount("");
       setDueDate("");
       setPatientId("");
       setSupplierId("");
+      setBillingType("PARTICULAR");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao lançar conta.");
     } finally {
@@ -72,17 +88,29 @@ export function TransactionForm({
       {error && <div className="alert alert-error">{error}</div>}
 
       {type === "RECEIVABLE" ? (
-        <label className="field">
-          <span className="label">Paciente *</span>
-          <select className="input" required value={patientId} onChange={(e) => setPatientId(e.target.value)}>
-            <option value="">Selecione...</option>
-            {patients?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="form-grid">
+          <label className="field">
+            <span className="label">Paciente *</span>
+            <select className="input" required value={patientId} onChange={(e) => handlePatientChange(e.target.value)}>
+              <option value="">Selecione...</option>
+              {patients?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="label">Cobrança</span>
+            <select className="input" value={billingType} onChange={(e) => setBillingType(e.target.value as BillingType)}>
+              {BILLING_TYPES.map((bt) => (
+                <option key={bt} value={bt}>
+                  {BILLING_TYPE_LABELS[bt]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       ) : (
         <label className="field">
           <span className="label">Fornecedor *</span>

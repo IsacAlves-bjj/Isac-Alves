@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError } from "../api/client";
-import type { Patient } from "../api/types";
+import { BILLING_TYPE_LABELS } from "../api/types";
+import type { BillingType, Patient } from "../api/types";
 import { isoToLocalDateInput } from "../utils/format";
 
 export interface PatientFormValues {
@@ -16,9 +17,12 @@ export interface PatientFormValues {
   height?: number;
   comorbidities?: string;
   preferredLocation?: "Consultório" | "Domiciliar" | "Teleconsulta";
+  billingType?: BillingType;
+  insuranceName?: string;
 }
 
 const LOCATIONS = ["Consultório", "Domiciliar", "Teleconsulta"] as const;
+const BILLING_TYPES = Object.keys(BILLING_TYPE_LABELS) as BillingType[];
 
 // Formulário reaproveitado no cadastro (PatientsListPage → novo) e na edição
 // da ficha (PatientDetailPage) — mesmos campos, muda só o submit.
@@ -42,6 +46,8 @@ export function PatientForm({
   const [height, setHeight] = useState(initial?.height != null ? String(initial.height) : "");
   const [comorbidities, setComorbidities] = useState(initial?.comorbidities ?? "");
   const [preferredLocation, setPreferredLocation] = useState(initial?.preferredLocation ?? "");
+  const [billingType, setBillingType] = useState<BillingType>(initial?.billingType ?? "PARTICULAR");
+  const [insuranceName, setInsuranceName] = useState(initial?.insuranceName ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -62,6 +68,8 @@ export function PatientForm({
         height: height ? Number(height) : undefined,
         comorbidities: comorbidities || undefined,
         preferredLocation: (preferredLocation as PatientFormValues["preferredLocation"]) || undefined,
+        billingType,
+        insuranceName: billingType === "CONVENIO" ? insuranceName || undefined : undefined,
       });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao salvar paciente.");
@@ -118,6 +126,22 @@ export function PatientForm({
             ))}
           </select>
         </label>
+        <label className="field">
+          <span className="label">Cobrança</span>
+          <select className="input" value={billingType} onChange={(e) => setBillingType(e.target.value as BillingType)}>
+            {BILLING_TYPES.map((bt) => (
+              <option key={bt} value={bt}>
+                {BILLING_TYPE_LABELS[bt]}
+              </option>
+            ))}
+          </select>
+        </label>
+        {billingType === "CONVENIO" && (
+          <label className="field">
+            <span className="label">Nome do convênio</span>
+            <input className="input" value={insuranceName} onChange={(e) => setInsuranceName(e.target.value)} />
+          </label>
+        )}
       </div>
 
       <label className="field">

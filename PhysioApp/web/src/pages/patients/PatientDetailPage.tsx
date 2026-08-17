@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiError } from "../../api/client";
+import { BILLING_TYPE_LABELS } from "../../api/types";
 import type {
   Appointment,
   ClinicalRecord,
@@ -233,6 +234,17 @@ export function PatientDetailPage() {
                       <div>
                         <dt>Atendimento preferido</dt>
                         <dd>{patient.preferredLocation ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Cobrança</dt>
+                        <dd>
+                          <Badge tone={patient.billingType === "CONVENIO" ? "info" : "neutral"}>
+                            {BILLING_TYPE_LABELS[patient.billingType]}
+                          </Badge>
+                          {patient.billingType === "CONVENIO" && patient.insuranceName && (
+                            <span style={{ marginLeft: 8 }}>{patient.insuranceName}</span>
+                          )}
+                        </dd>
                       </div>
                       <div>
                         <dt>Observações</dt>

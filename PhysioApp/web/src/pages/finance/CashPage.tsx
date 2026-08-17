@@ -96,6 +96,10 @@ export function CashPage() {
               </div>
             </div>
             <p className="muted small">
+              Particular: {formatCurrency(monthSummary.revenueParticular)} · Convênio:{" "}
+              {formatCurrency(monthSummary.revenueConvenio)}
+            </p>
+            <p className="muted small">
               Conta pelo dia em que a conta foi efetivamente paga, não pela data de vencimento.
             </p>
           </section>
