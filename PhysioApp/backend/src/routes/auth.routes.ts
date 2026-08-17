@@ -29,7 +29,14 @@ authRouter.post(
     const token = signStaffToken(user.id, user.role as "ADMIN" | "FISIOTERAPEUTA");
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, document: user.document },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        document: user.document,
+        avatarUrl: user.avatarUrl,
+      },
     });
   })
 );
@@ -59,13 +66,24 @@ authRouter.get(
   asyncHandler(async (req, res) => {
     if (req.auth?.kind !== "staff") throw new AppError("Acesso restrito à equipe", 403);
     const user = await prisma.user.findUniqueOrThrow({ where: { id: req.auth.sub } });
-    res.json({ id: user.id, name: user.name, email: user.email, role: user.role, document: user.document });
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      document: user.document,
+      avatarUrl: user.avatarUrl,
+    });
   })
 );
 
 const updateMeSchema = z.object({
   name: z.string().min(1).optional(),
   document: z.string().optional(),
+  // Data URL (base64) de uma foto pequena — sem serviço de storage próprio
+  // ainda, a imagem fica guardada direto no banco. Limite generoso o
+  // bastante para uma foto de perfil comprimida no navegador antes do envio.
+  avatarUrl: z.string().max(2_000_000).optional(),
 });
 
 authRouter.patch(
@@ -75,7 +93,14 @@ authRouter.patch(
     if (req.auth?.kind !== "staff") throw new AppError("Acesso restrito à equipe", 403);
     const data = updateMeSchema.parse(req.body);
     const user = await prisma.user.update({ where: { id: req.auth.sub }, data });
-    res.json({ id: user.id, name: user.name, email: user.email, role: user.role, document: user.document });
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      document: user.document,
+      avatarUrl: user.avatarUrl,
+    });
   })
 );
 

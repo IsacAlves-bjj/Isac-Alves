@@ -32,10 +32,10 @@ export function LoginPage() {
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="auth-brand">
-          <span className="sidebar-brand-mark">Fx</span>
+          <span className="sidebar-brand-mark">Ph</span>
           <h1>PhysioApp</h1>
         </div>
-        <p className="auth-subtitle">Painel da fisioterapeuta</p>
+        <p className="auth-subtitle">Painel de Dra. Gabrielly Gomes</p>
 
         {error && <div className="alert alert-error">{error}</div>}
 

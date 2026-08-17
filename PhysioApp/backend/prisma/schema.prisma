@@ -27,6 +27,7 @@ model User {
   passwordHash String
   role         String   @default("FISIOTERAPEUTA") // "ADMIN" | "FISIOTERAPEUTA"
   document     String? // CPF/CNPJ do profissional, usado como emitente nos recibos
+  avatarUrl    String? // foto de perfil (data URL ou link), exibida no painel
   createdAt    DateTime @default(now())
 
   clinicalRecords ClinicalRecord[]

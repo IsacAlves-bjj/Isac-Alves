@@ -190,7 +190,7 @@ async function main() {
   if (!existingUser) {
     await prisma.user.create({
       data: {
-        name: "Fisioterapeuta",
+        name: "Dra. Gabrielly Gomes",
         email,
         passwordHash: await bcrypt.hash("mudar123", 10),
         role: "ADMIN",

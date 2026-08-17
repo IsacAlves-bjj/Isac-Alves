@@ -1,29 +1,81 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { api, ApiError } from "../api/client";
 import type { StaffUser } from "../api/types";
+import { Avatar } from "../components/Avatar";
+
+const AVATAR_MAX_SIZE = 320; // px — evita salvar fotos gigantes como texto no banco
+
+// Redimensiona a imagem no navegador antes de enviar, para não guardar um
+// arquivo de câmera de vários MB direto como texto no banco (sem serviço de
+// storage próprio ainda, ver backend/src/routes/auth.routes.ts).
+function resizeImageToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Arquivo de imagem inválido."));
+      img.onload = () => {
+        const scale = Math.min(1, AVATAR_MAX_SIZE / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Não foi possível processar a imagem."));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export function SettingsPage() {
   const { user, updateUser } = useAuth();
+  const [name, setName] = useState(user?.name ?? "");
   const [document, setDocument] = useState(user?.document ?? "");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleSaveDocument(event: FormEvent) {
+  async function handleSaveProfile(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSaved(false);
     setSaving(true);
     try {
-      const updated = await api.patch<StaffUser>("/auth/me", { document: document || undefined });
+      const updated = await api.patch<StaffUser>("/auth/me", {
+        name: name || undefined,
+        document: document || undefined,
+      });
       updateUser(updated);
       setSaved(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao salvar.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setUploadingPhoto(true);
+    try {
+      const avatarUrl = await resizeImageToDataUrl(file);
+      const updated = await api.patch<StaffUser>("/auth/me", { avatarUrl });
+      updateUser(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Erro ao enviar foto.");
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -35,36 +87,53 @@ export function SettingsPage() {
       </header>
 
       <section className="card">
-        <h2>Conta</h2>
-        <dl className="info-list">
+        <h2>Perfil</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
+          <Avatar name={user?.name} avatarUrl={user?.avatarUrl} size={64} />
           <div>
-            <dt>Nome</dt>
-            <dd>{user?.name}</dd>
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPhoto}
+            >
+              {uploadingPhoto ? "Enviando..." : user?.avatarUrl ? "Trocar foto" : "Adicionar foto"}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={handlePhotoChange}
+            />
+            <p className="muted small" style={{ marginTop: 6 }}>
+              Aparece no painel e nos recibos. Prefira uma foto quadrada, formal e bem iluminada.
+            </p>
           </div>
-          <div>
-            <dt>E-mail</dt>
-            <dd>{user?.email}</dd>
-          </div>
-          <div>
-            <dt>Perfil</dt>
-            <dd>{user?.role === "ADMIN" ? "Administradora" : "Fisioterapeuta"}</dd>
-          </div>
-        </dl>
-      </section>
+        </div>
 
-      <section className="card">
-        <h2>Dados para recibo</h2>
-        <p className="muted small" style={{ marginBottom: 12 }}>
-          Seu CPF ou CNPJ aparece como emitente nos recibos gerados em Financeiro → Contas a
-          receber.
-        </p>
-        <form className="form" onSubmit={handleSaveDocument}>
+        <form className="form" onSubmit={handleSaveProfile}>
           {error && <div className="alert alert-error">{error}</div>}
-          {saved && <div className="alert" style={{ background: "var(--success-bg)", color: "var(--success)" }}>Salvo.</div>}
-          <label className="field field-narrow">
-            <span className="label">CPF ou CNPJ</span>
-            <input className="input" value={document} onChange={(e) => setDocument(e.target.value)} />
-          </label>
+          {saved && (
+            <div className="alert" style={{ background: "var(--success-bg)", color: "var(--success)" }}>
+              Salvo.
+            </div>
+          )}
+          <div className="form-grid">
+            <label className="field">
+              <span className="label">Nome</span>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <label className="field">
+              <span className="label">E-mail</span>
+              <input className="input" value={user?.email ?? ""} disabled />
+            </label>
+            <label className="field field-narrow">
+              <span className="label">CPF ou CNPJ</span>
+              <input className="input" value={document} onChange={(e) => setDocument(e.target.value)} />
+            </label>
+          </div>
+          <p className="muted small">O CPF/CNPJ aparece como emitente nos recibos em Financeiro → Contas a receber.</p>
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? "Salvando..." : "Salvar"}
           </button>

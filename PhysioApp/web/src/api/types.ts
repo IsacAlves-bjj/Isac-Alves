@@ -9,6 +9,7 @@ export interface StaffUser {
   email: string;
   role: StaffRole;
   document?: string | null;
+  avatarUrl?: string | null;
 }
 
 export type LeadStatus = "NOVO" | "EM_REVISAO" | "AGENDADO" | "DESCARTADO";
