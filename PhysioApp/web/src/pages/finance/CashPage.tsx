@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { api, ApiError } from "../../api/client";
-import type { CashSession } from "../../api/types";
+import type { CashSession, MonthlyFinanceSummary } from "../../api/types";
 import { LoadState } from "../../components/LoadState";
 import { formatCurrency, formatDateTime } from "../../utils/format";
+
+const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
 
 export function CashPage() {
   const [current, setCurrent] = useState<CashSession | null>(null);
   const [history, setHistory] = useState<CashSession[]>([]);
+  const [monthSummary, setMonthSummary] = useState<MonthlyFinanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -18,12 +21,14 @@ export function CashPage() {
     setLoading(true);
     setError(null);
     try {
-      const [cur, sessions] = await Promise.all([
+      const [cur, sessions, summary] = await Promise.all([
         api.get<CashSession | null>("/finance/cash-sessions/current"),
         api.get<CashSession[]>("/finance/cash-sessions"),
+        api.get<MonthlyFinanceSummary>("/finance/summary/month"),
       ]);
       setCurrent(cur);
       setHistory(sessions);
+      setMonthSummary(summary);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao carregar o caixa.");
     } finally {
@@ -72,6 +77,29 @@ export function CashPage() {
     <div>
       <LoadState loading={loading} error={error} onRetry={load}>
         {actionError && <div className="alert alert-error">{actionError}</div>}
+
+        {monthSummary && (
+          <section className="card">
+            <h2>Resumo de {MONTH_LABEL_FORMATTER.format(new Date(`${monthSummary.month}-01T12:00:00`))}</h2>
+            <div className="stat-grid stat-grid-money">
+              <div className="stat-card stat-card-success">
+                <span className="stat-value">{formatCurrency(monthSummary.revenue)}</span>
+                <span className="stat-label">Faturamento do mês · {monthSummary.receivablesCount} recebimento(s)</span>
+              </div>
+              <div className="stat-card stat-card-danger">
+                <span className="stat-value">{formatCurrency(monthSummary.expenses)}</span>
+                <span className="stat-label">Despesas do mês · {monthSummary.payablesCount} pagamento(s)</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{formatCurrency(monthSummary.net)}</span>
+                <span className="stat-label">Resultado do mês</span>
+              </div>
+            </div>
+            <p className="muted small">
+              Conta pelo dia em que a conta foi efetivamente paga, não pela data de vencimento.
+            </p>
+          </section>
+        )}
 
         {current ? (
           <section className="card">

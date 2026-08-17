@@ -259,6 +259,15 @@ export interface CashSession {
   transactions?: Transaction[];
 }
 
+export interface MonthlyFinanceSummary {
+  month: string; // "YYYY-MM"
+  revenue: number;
+  expenses: number;
+  net: number;
+  receivablesCount: number;
+  payablesCount: number;
+}
+
 export interface DashboardSummary {
   pendingLeads: number;
   attentionLeads: number;

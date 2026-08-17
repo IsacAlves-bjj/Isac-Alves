@@ -220,3 +220,42 @@ financeRouter.post(
     res.status(201).json(payload);
   })
 );
+
+// --- Resumo do mês (faturamento e despesas) -----------------------------
+// Contabiliza pela data de pagamento (paidAt), não pela data de vencimento
+// — é o que efetivamente entrou/saiu do caixa no mês, não o que estava
+// previsto. ?month=YYYY-MM para consultar um mês específico; sem o
+// parâmetro, usa o mês corrente.
+
+financeRouter.get(
+  "/summary/month",
+  asyncHandler(async (req, res) => {
+    const monthParam = req.query.month as string | undefined;
+    const reference = monthParam ? new Date(`${monthParam}-01T00:00:00.000Z`) : new Date();
+    if (isNaN(reference.getTime())) throw new AppError("Mês inválido, use o formato YYYY-MM", 400);
+
+    const start = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const end = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
+
+    const [receivablesPaid, payablesPaid] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { type: "RECEIVABLE", status: "PAID", paidAt: { gte: start, lt: end } },
+      }),
+      prisma.transaction.findMany({
+        where: { type: "PAYABLE", status: "PAID", paidAt: { gte: start, lt: end } },
+      }),
+    ]);
+
+    const revenue = receivablesPaid.reduce((sum, t) => sum + t.amount, 0);
+    const expenses = payablesPaid.reduce((sum, t) => sum + t.amount, 0);
+
+    res.json({
+      month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
+      revenue,
+      expenses,
+      net: revenue - expenses,
+      receivablesCount: receivablesPaid.length,
+      payablesCount: payablesPaid.length,
+    });
+  })
+);
