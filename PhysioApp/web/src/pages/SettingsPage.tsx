@@ -63,6 +63,13 @@ export function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const priceTableInputRef = useRef<HTMLInputElement>(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+
   const [priceList, setPriceList] = useState<PriceListItem[]>([]);
   const [priceListError, setPriceListError] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState("");
@@ -133,6 +140,28 @@ export function SettingsPage() {
       setError(err instanceof ApiError ? err.message : "Erro ao salvar.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleChangePassword(event: FormEvent) {
+    event.preventDefault();
+    setPasswordError(null);
+    setPasswordSaved(false);
+    if (newPassword !== confirmPassword) {
+      setPasswordError("A confirmação não bate com a nova senha.");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.post("/auth/me/password", { currentPassword, newPassword });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordSaved(true);
+    } catch (err) {
+      setPasswordError(err instanceof ApiError ? err.message : "Erro ao trocar a senha.");
+    } finally {
+      setChangingPassword(false);
     }
   }
 
@@ -227,6 +256,60 @@ export function SettingsPage() {
           <p className="muted small">O CPF/CNPJ aparece como emitente nos recibos em Financeiro → Contas a receber.</p>
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? "Salvando..." : "Salvar"}
+          </button>
+        </form>
+      </section>
+
+      <section className="card">
+        <h2>Segurança</h2>
+        <p className="muted">Troque sua senha de acesso ao painel periodicamente, e sempre que suspeitar que alguém mais possa tê-la visto.</p>
+        <form className="form" onSubmit={handleChangePassword} style={{ marginTop: 12 }}>
+          {passwordError && <div className="alert alert-error">{passwordError}</div>}
+          {passwordSaved && (
+            <div className="alert" style={{ background: "var(--success-bg)", color: "var(--success)" }}>
+              Senha alterada.
+            </div>
+          )}
+          <label className="field">
+            <span className="label">Senha atual</span>
+            <input
+              className="input"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </label>
+          <div className="form-grid">
+            <label className="field">
+              <span className="label">Nova senha</span>
+              <input
+                className="input"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span className="label">Confirmar nova senha</span>
+              <input
+                className="input"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </label>
+          </div>
+          <p className="muted small">Mínimo de 8 caracteres.</p>
+          <button type="submit" className="btn btn-primary" disabled={changingPassword}>
+            {changingPassword ? "Salvando..." : "Trocar senha"}
           </button>
         </form>
       </section>

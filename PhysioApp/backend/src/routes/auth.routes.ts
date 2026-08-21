@@ -106,6 +106,38 @@ authRouter.patch(
   })
 );
 
+// --- Troca de senha da equipe ----------------------------------------
+// Exige a senha atual (não basta estar logada) — evita que alguém que
+// pegue a sessão aberta troque a senha e tranque a dona de fora.
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, "A nova senha precisa ter pelo menos 8 caracteres"),
+});
+
+authRouter.post(
+  "/me/password",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (req.auth?.kind !== "staff") throw new AppError("Acesso restrito à equipe", 403);
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: req.auth.sub } });
+    // 400, não 401 — isto é uma requisição autenticada normal em que a senha
+    // atual informada está errada, não um problema de sessão/token. O
+    // cliente HTTP do painel trata qualquer 401 como "sessão inválida" e
+    // desloga automaticamente (ver web/src/api/client.ts) — um 401 aqui
+    // derrubaria a sessão da própria fisioterapeuta só por ela ter digitado
+    // a senha atual errada.
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) throw new AppError("Senha atual incorreta", 400);
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    res.json({ ok: true });
+  })
+);
+
 authRouter.post(
   "/patient/otp/verify",
   asyncHandler(async (req, res) => {
