@@ -262,11 +262,22 @@ financeRouter.post(
     if (transaction.type !== "RECEIVABLE") throw new AppError("Recibo só se aplica a contas a receber", 400);
     if (transaction.status !== "PAID") throw new AppError("Só é possível emitir recibo de uma conta já paga", 400);
 
-    await prisma.receipt.upsert({
-      where: { transactionId: transaction.id },
-      update: {},
-      create: { transactionId: transaction.id },
-    });
+    try {
+      await prisma.receipt.upsert({
+        where: { transactionId: transaction.id },
+        update: {},
+        create: { transactionId: transaction.id },
+      });
+    } catch (err) {
+      // P2002 (unique constraint) pode acontecer mesmo dentro de um
+      // upsert sob concorrência real (ex.: StrictMode do React chamando o
+      // efeito duas vezes, ou duplo clique) — outra requisição já criou o
+      // recibo entre o SELECT e o INSERT deste upsert. Não é erro de
+      // verdade: o recibo existe, é só buscar e devolver.
+      const isUniqueConstraintError =
+        typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "P2002";
+      if (!isUniqueConstraintError) throw err;
+    }
 
     const payload = await buildReceiptPayload(transaction.id);
     res.status(201).json(payload);

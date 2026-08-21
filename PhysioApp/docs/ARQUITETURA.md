@@ -106,7 +106,17 @@ entidades principais:
 - **Receipt** — recibo de uma `Transaction` recebível já paga. Emitido
   uma única vez por transação — reemitir retorna o mesmo recibo em vez de
   gerar um novo número, usando `User.document` (CPF/CNPJ cadastrado em
-  Configurações) como emitente.
+  Configurações) como emitente. `POST /transactions/:id/receipt` trata
+  `P2002` (unique constraint) no upsert como sucesso, não erro — sob
+  concorrência real (StrictMode do React chamando o efeito duas vezes,
+  duplo clique) duas requisições podem colidir entre o SELECT e o INSERT
+  do upsert; a segunda só busca o recibo que a primeira já criou.
+  Layout do recibo (`web/src/components/ReceiptView.tsx`) é formal —
+  número em caixa, valor destacado, valor por extenso
+  (`web/src/utils/valorExtenso.ts`) e linha de assinatura — pensado para
+  impressão/"salvar como PDF" via `window.print()` (`.printable-area` +
+  `@media print` em `index.css`), sem depender de biblioteca de geração
+  de PDF.
 - **Relatórios** (sem model próprio — calculado sob demanda):
   `GET /finance/export/month` gera um CSV (planilha) com todos os
   lançamentos do mês, para enviar ao contador. A apuração do Carnê-Leão

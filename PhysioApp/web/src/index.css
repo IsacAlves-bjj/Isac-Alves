@@ -945,7 +945,99 @@ textarea.input {
   padding-bottom: 12px;
 }
 
+/* Layout formal do recibo — mais parecido com um documento tradicional
+   (bloco de recibo em papel) do que com o restante da UI do painel. */
+.receipt-formal {
+  font-family: Georgia, "Times New Roman", serif;
+  max-width: 640px;
+  padding: 32px;
+}
+
+.receipt-formal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 2px solid var(--text);
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.receipt-formal-issuer {
+  font-size: 1.1rem;
+}
+
+.receipt-formal-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--text);
+  border-radius: 4px;
+  padding: 6px 16px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.receipt-formal-box-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.receipt-formal-box-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.receipt-formal-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  background: var(--brand-bg);
+}
+
+.receipt-formal-value strong {
+  font-size: 1.3rem;
+}
+
+.receipt-formal-body {
+  line-height: 1.8;
+  text-align: justify;
+  margin-bottom: 40px;
+}
+
+.receipt-formal-signature {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 320px;
+  margin: 0 auto 24px;
+  text-align: center;
+}
+
+.receipt-formal-signature-line {
+  width: 100%;
+  border-top: 1px solid var(--text);
+  margin-bottom: 6px;
+}
+
+.receipt-formal-footer {
+  text-align: center;
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+}
+
 @media print {
+  @page {
+    margin: 2cm;
+  }
   body * {
     visibility: hidden;
   }
@@ -959,6 +1051,8 @@ textarea.input {
     left: 0;
     width: 100%;
     border: none;
+    max-width: none;
+    padding: 0;
   }
 }
 
