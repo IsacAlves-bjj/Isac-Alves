@@ -319,3 +319,90 @@ financeRouter.get(
     });
   })
 );
+
+// --- Exportação de planilha (para o contador) ----------------------------
+// Lista todas as contas (receber + pagar) com vencimento no mês, uma linha
+// por lançamento — o contador decide o que fazer com pendentes vs pagos,
+// por isso não filtra por status como o resumo do mês (que só soma pagos).
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  pix: "Pix",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+  transferencia: "Transferência",
+};
+
+const BILLING_TYPE_LABELS: Record<string, string> = {
+  PARTICULAR: "Particular",
+  CONVENIO: "Convênio",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pendente",
+  PAID: "Pago",
+  OVERDUE: "Vencido",
+  CANCELLED: "Cancelado",
+};
+
+function csvField(value: string): string {
+  if (/[",\n;]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+function formatDateBR(date: Date | null): string {
+  if (!date) return "";
+  return date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
+financeRouter.get(
+  "/export/month",
+  asyncHandler(async (req, res) => {
+    const monthParam = req.query.month as string | undefined;
+    const reference = monthParam ? new Date(`${monthParam}-01T00:00:00.000Z`) : new Date();
+    if (isNaN(reference.getTime())) throw new AppError("Mês inválido, use o formato YYYY-MM", 400);
+
+    const start = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const end = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
+    const monthLabel = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+
+    const transactions = await prisma.transaction.findMany({
+      where: { dueDate: { gte: start, lt: end } },
+      include: { patient: true, supplier: true },
+      orderBy: { dueDate: "asc" },
+    });
+
+    const header = [
+      "Data de vencimento",
+      "Tipo",
+      "Descrição",
+      "Paciente/Fornecedor",
+      "Cobrança",
+      "Forma de pagamento",
+      "Status",
+      "Data de pagamento",
+      "Valor (R$)",
+    ];
+
+    const rows = transactions.map((t) =>
+      [
+        formatDateBR(t.dueDate),
+        t.type === "RECEIVABLE" ? "Receita" : "Despesa",
+        t.description,
+        t.patient?.name ?? t.supplier?.name ?? "",
+        t.billingType ? BILLING_TYPE_LABELS[t.billingType] ?? t.billingType : "",
+        t.paymentMethod ? PAYMENT_METHOD_LABELS[t.paymentMethod] ?? t.paymentMethod : "",
+        STATUS_LABELS[t.status] ?? t.status,
+        formatDateBR(t.paidAt),
+        t.amount.toFixed(2).replace(".", ","),
+      ].map(csvField)
+    );
+
+    // BOM UTF-8 no início — sem isso o Excel abre acentos/ç quebrados.
+    const csv = "﻿" + [header, ...rows].map((line) => line.join(";")).join("\r\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="physioapp-financeiro-${monthLabel}.csv"`);
+    res.send(csv);
+  })
+);

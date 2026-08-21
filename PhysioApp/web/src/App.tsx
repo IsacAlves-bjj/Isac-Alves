@@ -14,6 +14,7 @@ import { CashPage } from "./pages/finance/CashPage";
 import { ReceivablesPage } from "./pages/finance/ReceivablesPage";
 import { PayablesPage } from "./pages/finance/PayablesPage";
 import { SuppliersPage } from "./pages/finance/SuppliersPage";
+import { ReportsPage } from "./pages/finance/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="receber" element={<ReceivablesPage />} />
             <Route path="pagar" element={<PayablesPage />} />
             <Route path="fornecedores" element={<SuppliersPage />} />
+            <Route path="relatorios" element={<ReportsPage />} />
           </Route>
           <Route path="configuracoes" element={<SettingsPage />} />
         </Route>

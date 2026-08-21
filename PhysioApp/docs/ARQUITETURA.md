@@ -47,7 +47,7 @@ autenticado como fisioterapeuta/admin.
 | **Pacientes** | Cadastro completo, histórico, conversão de lead → paciente |
 | **Agenda** | Agendamento de sessões, status (agendado/confirmado/realizado/faltou/cancelado) |
 | **Prontuário/Evolução** | Registro clínico por sessão (SOAP simplificado), anexos, plano terapêutico |
-| **Financeiro** | Caixa (sessões de abertura/fechamento), Contas a Receber (por paciente/sessão ou pacote), Contas a Pagar (fornecedores), Fornecedores |
+| **Financeiro** | Caixa (sessões de abertura/fechamento), Contas a Receber (por paciente/sessão ou pacote), Contas a Pagar (fornecedores), Fornecedores, Relatórios (planilha para contador, apuração estimada do Carnê-Leão) |
 | **Notificações** (stub v1) | Lembrete de sessão, aviso de novo lead — hook pronto, envio real (WhatsApp/SMS/e-mail) fica para integração futura |
 
 ## 3. Modelo de dados (Prisma)
@@ -107,6 +107,19 @@ entidades principais:
   uma única vez por transação — reemitir retorna o mesmo recibo em vez de
   gerar um novo número, usando `User.document` (CPF/CNPJ cadastrado em
   Configurações) como emitente.
+- **Relatórios** (sem model próprio — calculado sob demanda):
+  `GET /finance/export/month` gera um CSV (planilha) com todos os
+  lançamentos do mês, para enviar ao contador. A apuração do Carnê-Leão
+  (IRPF de autônomo) é calculada **inteiramente no frontend**
+  (`web/src/utils/carneLeao.ts`), sem endpoint de backend — usa a receita
+  particular do mês (já disponível via `/finance/summary/month`) como
+  ponto de partida, editável. É uma calculadora de apoio, não substitui a
+  apuração oficial no Carnê-Leão Web da Receita Federal nem a revisão de
+  um contador: a UI deixa isso explícito. As premissas tributárias
+  (tabela progressiva, desconto simplificado, e o redutor da Lei
+  15.270/2025 vigente a partir de jan/2026) estão documentadas em
+  comentários no próprio arquivo — revisar/atualizar se a legislação
+  mudar.
 - **Supplier** — fornecedores (nome, categoria de despesa, contato).
 - **PriceListItem** — tabela de preços padrão da clínica (serviço/pacote +
   valor de referência, `active` para desativar sem apagar histórico). Não

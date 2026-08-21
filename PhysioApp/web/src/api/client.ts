@@ -95,4 +95,33 @@ export const api = {
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: "PUT", body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  // Baixa um arquivo (CSV, PDF...) e dispara o download no navegador — usa
+  // fetch com o mesmo header de auth, já que um <a href> puro não consegue
+  // mandar o Bearer token.
+  download: async (path: string, fallbackFilename: string): Promise<void> => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const response = await fetch(`${API_URL}${path}`, { headers });
+    if (!response.ok) {
+      const data: unknown = await response.json().catch(() => null);
+      const message = isRecord(data) && typeof data.error === "string" ? data.error : `Erro ${response.status}`;
+      throw new ApiError(message, response.status);
+    }
+
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match?.[1] ?? fallbackFilename;
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
 };

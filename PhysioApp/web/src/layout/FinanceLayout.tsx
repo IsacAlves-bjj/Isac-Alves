@@ -5,6 +5,7 @@ const TABS = [
   { to: "/financeiro/receber", label: "Contas a Receber" },
   { to: "/financeiro/pagar", label: "Contas a Pagar" },
   { to: "/financeiro/fornecedores", label: "Fornecedores" },
+  { to: "/financeiro/relatorios", label: "Relatórios" },
 ];
 
 export function FinanceLayout() {
