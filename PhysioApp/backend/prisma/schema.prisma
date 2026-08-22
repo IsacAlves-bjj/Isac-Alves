@@ -1,0 +1,344 @@
+// Schema do PhysioApp — fonte de verdade do modelo de dados.
+// Ver PhysioApp/docs/ARQUITETURA.md para o desenho conceitual completo.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Postgres em dev e produção — mesma engine nas duas pontas para não
+  // divergir em comportamento (ex.: precisão de Float, locking). Local:
+  // instância Postgres na máquina de dev. Produção: Postgres gerenciado
+  // (Railway), indicado via DATABASE_URL.
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// Auth / equipe
+// ---------------------------------------------------------------------
+
+// SQLite não suporta enum nativo no Prisma — os valores válidos abaixo
+// são impostos pelos schemas Zod nas rotas (fonte de verdade de validação).
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("FISIOTERAPEUTA") // "ADMIN" | "FISIOTERAPEUTA"
+  document     String? // CPF/CNPJ do profissional, usado como emitente nos recibos
+  avatarUrl    String? // foto de perfil (data URL ou link), exibida no painel
+  priceTableUrl  String? // tabela de preços (data URL), documento de referência da fisioterapeuta
+  priceTableName String? // nome original do arquivo enviado, para exibir no painel
+  priceTableUpdatedAt DateTime?
+  createdAt    DateTime @default(now())
+
+  clinicalRecords ClinicalRecord[]
+  cashSessions    CashSession[]
+}
+
+// ---------------------------------------------------------------------
+// Triagem: catálogo de categorias/perguntas ("caixinhas")
+// ---------------------------------------------------------------------
+
+model TriageCategory {
+  id          String   @id @default(cuid())
+  key         String   @unique // ex: "coluna", "ombro", "outro"
+  title       String
+  subtitle    String
+  icon        String   @default("activity")
+  order       Int      @default(0)
+  active      Boolean  @default(true)
+
+  questions TriageQuestion[]
+  leads     Lead[]
+}
+
+// type: "TEXT" | "LONG_TEXT" | "SINGLE_CHOICE" | "MULTI_CHOICE" | "SCALE_0_10" | "BOOLEAN" | "BODY_MAP"
+model TriageQuestion {
+  id         String       @id @default(cuid())
+  categoryId String? // null = pergunta geral, aparece para todas as categorias
+  category   TriageCategory? @relation(fields: [categoryId], references: [id])
+  section    String       // "geral" | "dor" | "funcional" | "historico" | "especifica" | "red_flag" | "objetivo" | "logistica"
+  text       String
+  type       String       @default("TEXT")
+  options    String? // JSON stringificado com as opções, quando aplicável
+  isRedFlag  Boolean      @default(false)
+  required   Boolean      @default(true)
+  order      Int          @default(0)
+  active     Boolean      @default(true)
+
+  answers LeadAnswer[]
+}
+
+// ---------------------------------------------------------------------
+// Leads (pré-triagem vinda do app do paciente)
+// ---------------------------------------------------------------------
+
+// status: "NOVO" | "EM_REVISAO" | "AGENDADO" | "DESCARTADO"
+// priority: "NORMAL" | "ATENCAO_CLINICA" | "REVISAO_MANUAL"
+model Lead {
+  id         String   @id @default(cuid())
+  name       String
+  phone      String
+  email      String?
+  source     String? // indicação, redes sociais, já é paciente, convênio...
+  categoryId String
+  category   TriageCategory @relation(fields: [categoryId], references: [id])
+
+  chiefComplaint String? // resumo em uma frase, pergunta 1 da triagem geral
+  painScore      Int? // 0-10
+  goal           String?
+  city           String?
+  preferredTimes String?
+
+  status         String   @default("NOVO")
+  priority       String   @default("NORMAL")
+  clinicalSummary String? // parágrafo gerado automaticamente (TRIAGEM.md §9.1)
+  suggestedCare   String? // sugestão de linha de cuidado (TRIAGEM.md §9.2)
+
+  answers   LeadAnswer[]
+  patient   Patient? // preenchido quando o lead é convertido em paciente
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LeadAnswer {
+  id         String         @id @default(cuid())
+  leadId     String
+  lead       Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  questionId String
+  question   TriageQuestion @relation(fields: [questionId], references: [id])
+  value      String // resposta serializada (texto, número, JSON de múltipla escolha)
+}
+
+// ---------------------------------------------------------------------
+// Pacientes
+// ---------------------------------------------------------------------
+
+// preferredLocation: "Consultório" | "Domiciliar" | "Teleconsulta" — só uma
+// sugestão de preenchimento ao criar um novo agendamento, não trava nada.
+model Patient {
+  id      String  @id @default(cuid())
+  name    String
+  phone   String
+  email   String?
+  birthDate DateTime?
+  document  String? // CPF, opcional
+  address   String?
+  notes     String?
+  weight    Float? // kg
+  height    Float? // cm
+  comorbidities String? // texto livre: "Diabetes, hipertensão..."
+  preferredLocation String?
+  billingType   String  @default("PARTICULAR") // "PARTICULAR" | "CONVENIO"
+  insuranceName String? // nome do convênio, preenchido quando billingType = "CONVENIO"
+
+  leadId String? @unique
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  appointments    Appointment[]
+  clinicalRecords ClinicalRecord[]
+  treatmentPlans  TreatmentPlan[]
+  transactions    Transaction[]
+  examRequests    ExamRequest[]
+  feedbacks       PatientFeedback[]
+  referrals       Referral[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TreatmentPlan {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  goal         String
+  careLine     String // linha de cuidado (texto livre, iniciada pela sugestão automática)
+  startDate    DateTime? // início do tratamento (pode ser anterior ao cadastro no sistema)
+  sessionsPlanned Int?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// Exames solicitados ao paciente
+// ---------------------------------------------------------------------
+
+// status: "SOLICITADO" | "RECEBIDO"
+model ExamRequest {
+  id              String    @id @default(cuid())
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId   String?
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
+  description     String // ex.: "Ressonância de joelho direito"
+  status          String    @default("SOLICITADO")
+  requestedAt     DateTime  @default(now())
+  resultNotes     String? // resumo do resultado, preenchido quando o paciente traz o exame
+  resultReceivedAt DateTime?
+}
+
+// ---------------------------------------------------------------------
+// Encaminhamentos (referência a outro profissional/especialidade)
+// ---------------------------------------------------------------------
+
+// status: "SOLICITADO" | "REALIZADO"
+model Referral {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  specialty   String // ex.: "Ortopedista", "Nutricionista" — texto livre
+  reason      String?
+  status      String   @default("SOLICITADO")
+  requestedAt DateTime @default(now())
+  notes       String? // retorno/observações após o encaminhamento
+}
+
+// ---------------------------------------------------------------------
+// Feedback do paciente (satisfação, não é dado clínico)
+// ---------------------------------------------------------------------
+
+model PatientFeedback {
+  id            String   @id @default(cuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  rating        Int // 1 a 5
+  comment       String?
+  createdAt     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// Agenda
+// ---------------------------------------------------------------------
+
+// status: "AGENDADO" | "CONFIRMADO" | "REALIZADO" | "FALTOU" | "CANCELADO"
+model Appointment {
+  id        String   @id @default(cuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  startsAt  DateTime
+  endsAt    DateTime
+  status    String   @default("AGENDADO")
+  location  String? // "Consultório" | "Domiciliar" | "Teleconsulta"
+  notes     String?
+  confirmationSentAt DateTime? // último disparo de confirmação enviado ao paciente
+
+  clinicalRecord ClinicalRecord?
+  transaction    Transaction?
+  examRequests   ExamRequest[]
+  feedbacks      PatientFeedback[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// Prontuário / Evolução (SOAP simplificado)
+// ---------------------------------------------------------------------
+
+model ClinicalRecord {
+  id            String   @id @default(cuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id])
+  appointmentId String   @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id])
+
+  subjective String // relato do paciente na sessão
+  objective  String // achados do exame físico
+  assessment String // avaliação/evolução do quadro
+  plan       String // conduta/plano para próxima sessão
+  painScore  Int? // 0-10 no dia
+
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// Financeiro
+// ---------------------------------------------------------------------
+
+model CashSession {
+  id           String    @id @default(cuid())
+  openedById   String
+  openedBy     User      @relation(fields: [openedById], references: [id])
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  openingBalance Float   @default(0)
+  closingBalance Float?
+  notes        String?
+
+  transactions Transaction[]
+}
+
+// Tabela de preços padrão da clínica: serviços/pacotes com valor de
+// referência, usada para preencher rápido o valor ao lançar uma conta a
+// receber ou fechar um pacote — não é vinculada à transação (a transação
+// guarda seu próprio valor, editável), é só uma lista de apoio.
+model PriceListItem {
+  id       String  @id @default(cuid())
+  name     String // ex.: "Sessão avulsa", "Avaliação inicial", "Pacote 8 sessões"
+  price    Float
+  active   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id       String  @id @default(cuid())
+  name     String
+  category String? // "aluguel", "material", "equipamento", "marketing"...
+  phone    String?
+  email    String?
+  notes    String?
+
+  transactions Transaction[]
+}
+
+// type: "RECEIVABLE" (conta a receber, paciente) | "PAYABLE" (conta a pagar, fornecedor)
+// status: "PENDING" | "PAID" | "OVERDUE" | "CANCELLED"
+model Transaction {
+  id          String   @id @default(cuid())
+  type        String
+  status      String   @default("PENDING")
+  description String
+  amount      Float
+  dueDate     DateTime
+  paidAt      DateTime?
+  paymentMethod String? // "dinheiro" | "pix" | "cartao_credito" | "cartao_debito" | "transferencia"
+  billingType   String? // "PARTICULAR" | "CONVENIO" — só se aplica a RECEIVABLE; registrado no
+                        // lançamento (não só no paciente) para o histórico não mudar se o
+                        // paciente trocar de convênio depois.
+
+  patientId String?
+  patient   Patient? @relation(fields: [patientId], references: [id])
+
+  appointmentId String? @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  cashSessionId String?
+  cashSession   CashSession? @relation(fields: [cashSessionId], references: [id])
+
+  receipt   Receipt?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Recibo de uma conta a receber já paga. Emitido uma única vez por
+// transação (reemitir devolve o mesmo recibo, não cria um novo número).
+model Receipt {
+  id            String      @id @default(cuid())
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  issuedAt      DateTime    @default(now())
+}

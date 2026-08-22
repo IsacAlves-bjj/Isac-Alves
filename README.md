@@ -148,3 +148,10 @@ If Not AbaDadosGerais.Selected Then AbaDadosGerais.Select
 ```
 
 Veja `Examples/Example_Components_Tab.bas`.
+
+---
+
+> **Nota:** este repositório também hospeda `PhysioApp/`, um projeto
+> separado e sem qualquer relação com o FrameworkX — um sistema de
+> gestão para consultório de fisioterapia (mobile + painel web +
+> backend). Ver `PhysioApp/README.md`.
